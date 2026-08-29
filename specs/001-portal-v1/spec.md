@@ -26,17 +26,38 @@ reads service state in a read-only way and never controls anything.
 
 ## Clarifications
 
-### Session 2026-08-29
+### Session 2026-08-30
 
-The ambiguity scan surfaced seven decision points. On the product owner's
-instruction they are **deferred to the specification pull-request review** rather
-than resolved now, and are listed under **Open Questions & Product-Owner
-Decisions**. They concern: the reverse-proxy route's existence and owner, the
-portal hostname, cellular behaviour for LAN-only targets, exact session lifetime
-and secret-rotation behaviour, the login throttle threshold, whether a single
-shared login is sufficient before external exposure, and the bundled icon set and
-its licensing. None blocks drafting; each is called out where it touches a
-requirement.
+The ambiguity scan surfaced eight decision points. They were carried into the
+specification pull-request review and the product owner has now decided them. They
+are recorded here and folded into the affected requirements; the acceptance gate
+below is unchanged.
+
+- Q: Does the HTTPS reverse-proxy route to the portal exist, and should this
+  project provision it? → A: Intended architecture uses the **existing estate
+  HTTPS reverse proxy**. Its route to the portal stays an **unverified external
+  acceptance gate** — verify before accepting external access. If absent, do **not**
+  provision or alter it here; stop deployment and report the blocker.
+- Q: What hostname will serve the portal? → A: A **`home.` subdomain of the
+  established estate domain**. The exact FQDN is stored only in untracked
+  `PRIVATE-CONTEXT.md`, never in the public repository.
+- Q: What happens when a LAN-only destination is opened from outside the home
+  network? → A: The tile is **visibly marked "LAN only"**; it must not fail
+  silently. The portal does not provide remote access to that destination.
+- Q: What is the exact session lifetime? → A: **Exactly 30 days.**
+- Q: What happens to existing sessions when the session signing secret is rotated?
+  → A: Rotation **forces re-authentication for all existing sessions**.
+- Q: What is the login throttle policy? → A: **Five failed attempts per client in a
+  rolling 15-minute window, then refuse further attempts for a 15-minute cool-off.**
+  Best-effort application protection, not a substitute for any future edge
+  protection.
+- Q: Is one shared household password sufficient for Portal v1? → A: **Yes**,
+  subject to the HTTPS + login/authentication requirements already specified.
+  Per-user accounts remain out of scope.
+- Q: Which icon set is bundled, and how is licensing handled? → A: A **locally
+  bundled subset of Dashboard Icons**. The Plan phase must verify its current
+  licence and include the required attribution/licence notice. **No icon is fetched
+  at runtime.**
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -75,7 +96,7 @@ indicator; tap a tile and confirm the configured destination opens.
 ### User Story 2 - Sign in once and stay signed in (Priority: P1)
 
 A household member reaches the portal's hostname over HTTPS, is presented with a
-polished mobile login, signs in, and is not asked again for about a month.
+polished mobile login, signs in, and is not asked again for 30 days.
 
 **Why this priority**: Nothing in the portal is usable without authentication, and
 a login that nags on every visit would kill everyday use on a phone.
@@ -94,13 +115,18 @@ and confirm the session ends.
 2. **Given** the login screen, **When** the user submits an incorrect password,
    **Then** they see a single generic "invalid credentials" message that does not
    indicate which field was wrong and does not reveal whether the username exists.
-3. **Given** repeated failed attempts from the same client, **When** a threshold is
-   exceeded, **Then** further attempts are refused for a cool-off period.
-4. **Given** a successful login, **When** the user returns after an extended period
-   (target ~30 days) without logging out, **Then** they are still authenticated.
+3. **Given** five failed attempts from the same client within a rolling 15-minute
+   window, **When** a sixth is made, **Then** it is refused and further attempts
+   stay refused for a 15-minute cool-off.
+4. **Given** a successful login, **When** the user returns any time within 30 days
+   without logging out, **Then** they are still authenticated; on day 31 they are
+   asked to log in again.
 5. **Given** an authenticated session, **When** the user chooses logout, **Then**
    the session is invalidated and the next request returns them to the login
    screen.
+6. **Given** existing valid sessions, **When** the operator rotates the session
+   signing secret, **Then** every existing session is invalidated and each user is
+   asked to log in again.
 
 ---
 
@@ -187,9 +213,9 @@ success response when the portal is serving.
   link is unconfigured rather than guessing.
 - **Session cookie present but invalid or expired**: treated as unauthenticated;
   user is returned to login without an error dump.
-- **LAN-only destination opened from outside the home network**: covered by an
-  open question — behaviour (fail vs. "LAN only" hint) is a product-owner
-  decision.
+- **LAN-only destination opened from outside the home network**: the tile carries a
+  visible "LAN only" marker; opening it may not connect, and the portal offers no
+  remote path to it — this is expected, not an error state to hide.
 - **Duplicate categories with different casing / whitespace**: normalised so a
   service is not split across near-identical groups.
 - **Very long service or category names**: truncated for layout without breaking
@@ -213,17 +239,21 @@ success response when the portal is serving.
 - **FR-004**: On any authentication failure the portal MUST return one generic
   message that does not distinguish "unknown user" from "wrong password" and does
   not indicate which field failed.
-- **FR-005**: The portal MUST throttle repeated failed authentication attempts from
-  the same client, refusing further attempts for a cool-off period once a threshold
-  is exceeded. (Threshold value: open question.)
+- **FR-005**: The portal MUST allow at most five failed authentication attempts per
+  client within a rolling 15-minute window; once exceeded it MUST refuse further
+  attempts from that client for a 15-minute cool-off. This is best-effort
+  application-level protection and is not represented as a substitute for any
+  future edge/proxy protection.
 - **FR-006**: A successful login MUST establish a session that persists across
-  browser and device restarts for a configured lifetime, targeted at
-  approximately 30 days. (Exact lifetime and rotation behaviour: open question.)
+  browser and device restarts for exactly 30 days, after which the user MUST
+  re-authenticate.
 - **FR-007**: The portal MUST provide an explicit logout that ends the current
   session.
 - **FR-008**: The session mechanism MUST be a browser cookie using the `__Host-`
   prefix with `Secure`, `HttpOnly`, and a `SameSite` policy set; it MUST be
   validated (integrity + expiry) on every request.
+- **FR-028**: Rotating the session signing secret MUST invalidate all existing
+  sessions, forcing every user to re-authenticate.
 
 **Service discovery & curation**
 
@@ -235,10 +265,14 @@ success response when the portal is serving.
   apply them to presentation, with documented defaults when absent:
   `homemedia.name`, `homemedia.icon` (a bundled icon identifier only),
   `homemedia.category`, `homemedia.description`, `homemedia.url` and/or
-  `homemedia.port` (link destination), and `homemedia.order` (sort weight).
-- **FR-012**: The portal MUST resolve icons only from a bundled set; an unknown or
-  malformed `homemedia.icon` value MUST fall back to a generic icon and MUST NOT
-  cause any external network request.
+  `homemedia.port` (link destination), `homemedia.order` (sort weight), and
+  `homemedia.lan_only` (marks the destination as reachable only on the home
+  network).
+- **FR-012**: The portal MUST resolve icons only from a locally bundled subset of
+  Dashboard Icons; an unknown or malformed `homemedia.icon` value MUST fall back to
+  a generic icon. No icon MUST be fetched at runtime from any external source. The
+  Plan phase MUST verify the Dashboard Icons licence in force at build time and
+  include the required attribution/licence notice with the bundled assets.
 - **FR-013**: Changes to these labels MUST take effect on the next portal data
   refresh after the service is re-applied, with no rebuild or redeploy of the
   portal.
@@ -257,6 +291,10 @@ success response when the portal is serving.
   and MUST open it without navigating the portal away from itself.
 - **FR-018**: When a service's link destination cannot be determined, the tile MUST
   indicate the link is unconfigured rather than opening an incorrect location.
+- **FR-029**: A service whose destination is reachable only on the home network
+  MUST be shown with a visible "LAN only" marker. The portal MUST NOT attempt to
+  proxy, tunnel, or otherwise provide remote access to such a destination; it only
+  links to it.
 
 **Presentation & accessibility**
 
@@ -323,18 +361,29 @@ success response when the portal is serving.
   shows a false "all down" or hides services).
 - **SC-010**: Stopping a labelled service is reflected as "not running" after an
   explicit refresh of the dashboard.
-- **SC-011**: A wrong-password attempt returns a generic failure, and repeated
-  failures are refused after the configured threshold.
+- **SC-011**: A wrong-password attempt returns a generic failure; a sixth failed
+  attempt from one client within 15 minutes is refused, and attempts stay refused
+  for a 15-minute cool-off.
+- **SC-012**: Every service labelled `homemedia.lan_only` shows a visible "LAN
+  only" marker on its tile.
+- **SC-013**: After the operator rotates the session signing secret, every
+  previously logged-in user is required to log in again on their next visit.
+- **SC-014**: A logged-in session stops being accepted exactly 30 days after login
+  (not sooner, not later) absent logout or secret rotation.
 
 ## Dependencies & Acceptance Gate
 
-- **External dependency (unverified):** external access depends on an existing
-  HTTPS reverse proxy, operated separately, routing a hostname to the portal's
-  private origin and forwarding the standard forwarded-for / forwarded-proto /
-  forwarded-host headers. Its existence and owner are an open question; the server
-  runbook currently lists a reverse proxy as a not-yet-done item.
-- **Acceptance gate:** external access MUST NOT be accepted as working until that
-  route is confirmed end-to-end (HTTPS hostname → portal login) with correct
+- **External dependency (unverified):** external access depends on the existing,
+  separately operated estate HTTPS reverse proxy routing a `home.` subdomain of the
+  estate domain to the portal's private origin and forwarding the standard
+  forwarded-for / forwarded-proto / forwarded-host headers. The server runbook
+  currently lists a reverse proxy as a not-yet-done item, so this route is treated
+  as not yet present until proven.
+- **This project does not provision it.** If the route is absent, this project MUST
+  NOT create or modify the reverse proxy, DNS, or any network path. Deployment for
+  external use stops and the blocker is reported to the product owner.
+- **Acceptance gate:** external access MUST NOT be accepted as working until the
+  route is confirmed end-to-end (HTTPS `home.` hostname → portal login) with correct
   forwarded headers. Portal design, build, and local verification may proceed in
   parallel; this gate is a dependency, not an assumption, and is not listed under
   Assumptions.
@@ -342,15 +391,18 @@ success response when the portal is serving.
 ## Assumptions
 
 - The portal's private origin address remains stable for the life of a deployment.
-  (It is currently a dynamic lease rather than a reservation — see Open Questions.)
+  It is currently a dynamic lease rather than a reservation; making it a
+  reservation is a server-operations task tracked in the server runbook, outside
+  this project.
 - Household members reach service destinations from their phones over the home
   network or an existing remote-access path; the portal does not provide remote
-  access to the services themselves.
-- A single shared household credential is acceptable for v1 (no per-user accounts).
-- The set of services to show in v1 is owner-selected and recorded in the
-  operator's private deployment notes, not in this public specification.
-- Icons are shipped bundled with the portal; no icon is fetched from a third party
-  at runtime.
+  access to the services themselves (LAN-only destinations are marked as such — see
+  FR-029).
+- The exact portal FQDN (a `home.` subdomain of the estate domain) and the v1
+  service inventory are recorded only in the operator's untracked private notes,
+  not in this public specification.
+- Icons are shipped bundled with the portal (a subset of Dashboard Icons); no icon
+  is fetched from a third party at runtime.
 
 ## Out of Scope (v1 Non-Goals)
 
@@ -372,22 +424,21 @@ MUST: use per-client tokens that can be revoked independently; be scoped narrowl
 to named read operations; and NEVER provide generic shell/command execution,
 Docker mutation, or raw Docker socket access.
 
-## Open Questions & Product-Owner Decisions
+## Product-Owner Decisions (recorded 2026-08-30)
 
-1. **Reverse-proxy route** — does the HTTPS reverse-proxy route to the portal
-   origin already exist? If not, who provisions it and when? (Gates all external
-   access; see Acceptance Gate.)
-2. **Portal hostname** — what hostname will the reverse proxy expose?
-3. **LAN-only destinations on cellular** — when a user opens a LAN-only service
-   from outside the home network, should the tile simply fail, or show a "LAN
-   only" hint / be visually marked?
-4. **Session lifetime & rotation** — is ~30 days exact? What should happen to
-   existing sessions when the signing secret is rotated (forced re-login assumed
-   acceptable)?
-5. **Login throttle threshold** — proposed default: 5 failed attempts per client
-   per 15 minutes, then a cool-off. Acceptable?
-6. **Shared-login sufficiency** — is one shared password acceptable for external
-   exposure, given the server runbook's note that non-Plex services exposed
-   externally should have "HTTPS + auth"?
-7. **Icon set & licensing** — which bundled icon set should be used, and is its
-   licence acknowledgement acceptable?
+All prior open questions are resolved; details and the exact wording are in
+**Clarifications** and folded into the requirements above. Summary:
+
+| # | Decision |
+|---|----------|
+| 1 | Use the existing estate HTTPS reverse proxy. Its route to the portal is an **unverified acceptance gate**; if absent, this project does not provision it — deployment stops and the blocker is reported. |
+| 2 | Hostname is a **`home.` subdomain of the estate domain**; exact FQDN only in untracked `PRIVATE-CONTEXT.md`. |
+| 3 | LAN-only tiles are **visibly marked "LAN only"** (FR-029); no silent failure, no remote access provided. |
+| 4 | Session lifetime is **exactly 30 days** (FR-006). |
+| 5 | Rotating the session signing secret **forces re-authentication for all sessions** (FR-028). |
+| 6 | Login throttle: **5 failures / rolling 15 min / client, then 15-min cool-off** (FR-005); best-effort, not a substitute for edge protection. |
+| 7 | **One shared household password** is sufficient for v1; per-user accounts remain out of scope. |
+| 8 | Icons are a **locally bundled subset of Dashboard Icons** (FR-012); the Plan phase verifies the licence and adds the required attribution; no runtime fetch. |
+
+No open questions remain for Portal v1. The reverse-proxy route stays an external
+acceptance gate to be verified before external access is accepted.

@@ -32,11 +32,16 @@
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
-- Seven decision points are intentionally recorded as **Open Questions & Product-Owner
-  Decisions**, not as `[NEEDS CLARIFICATION]` markers, on the product owner's instruction
-  to defer them to the specification pull-request review. Each is cross-referenced from the
-  requirement it affects (FR-005, FR-006, link behaviour, hostname, icon set), so the spec
-  remains testable with documented defaults in the meantime.
-- Naming of concrete labels (`homemedia.*`) and cookie prefix (`__Host-`) is retained as
-  interface vocabulary the product owner and constitution already fixed, not implementation
-  choice; no framework, language, or library is named.
+- **2026-08-30 (product-owner review):** all eight prior decision points are now resolved
+  and recorded in **Clarifications** and the **Product-Owner Decisions** table, and folded
+  into requirements — session lifetime exactly 30 days (FR-006), secret-rotation forces
+  re-auth (FR-028), throttle 5/15 min + 15-min cool-off (FR-005), LAN-only marker (FR-029,
+  `homemedia.lan_only`), Dashboard Icons subset + Plan-phase licence check (FR-012), shared
+  login sufficient (FR-003 + non-goals), `home.` subdomain (FQDN private only). **No open
+  questions remain.** The reverse-proxy route is retained as an external acceptance gate,
+  not an assumption.
+- Naming of concrete labels (`homemedia.*`), the cookie prefix (`__Host-`), Argon2id, and
+  the Dashboard Icons set is interface/product vocabulary fixed by the product owner and
+  constitution, not implementation choice; no framework, language, or library is named.
+- Tracked files reviewed for disclosure: no private IPs, hostnames/FQDNs, ports, server
+  paths, or service inventory appear in `spec.md` or this checklist.
