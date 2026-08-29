@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-29
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "Portal v1 — a curated, mobile-first internal service
 directory for one private home server, reached from a phone through an existing
