@@ -1,0 +1,10 @@
+# Private, machine-local deployment context — never commit
+PRIVATE-CONTEXT.md
+*.local.*
+
+# Agent-local settings that may hold credentials or tokens
+.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+*.swp
