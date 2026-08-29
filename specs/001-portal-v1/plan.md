@@ -161,7 +161,7 @@ PASS (pre- and post-design).** Complexity Tracking table is empty.
 specs/001-portal-v1/
 ├── spec.md              # Approved specification
 ├── plan.md              # This file
-├── research.md          # Phase 0 — decisions R1–R10
+├── research.md          # Phase 0 — decisions R1–R11
 ├── data-model.md        # Phase 1 — entities, parsing, state mapping, session
 ├── contracts/           # Phase 1 — interface contracts
 │   ├── README.md            # index + authorization matrix + "no public API" note
