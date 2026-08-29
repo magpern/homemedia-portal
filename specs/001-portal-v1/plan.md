@@ -40,11 +40,15 @@ dependency list".
 in-memory state is the login rate-limiter map (best-effort, rebuilt on restart).
 Sessions are stateless (signed cookie).
 
-**Testing**: `vitest` for unit (label parsing, status mapping, session
-sign/verify, rate-limiter, env validation); Playwright for e2e (auth flows,
-discovery isolation, PWA install signal, static-only cache) and accessibility
-(`@axe-core/playwright`, run twice incl. `reducedMotion: 'reduce'`, 360 px
-viewport). See [quickstart.md](./quickstart.md).
+**Testing**: `vitest` for unit (label parsing, status mapping incl. the two Docker
+failure modes, session sign/verify, rate-limiter, env validation); Playwright for
+e2e (auth flows, discovery isolation, PWA install signal, static-only cache) and
+accessibility (`@axe-core/playwright`, run twice incl. `reducedMotion: 'reduce'`,
+360 px viewport). **Auth/session e2e run over local HTTPS** behind a throwaway
+local TLS terminator so the real `Secure` / `__Host-` cookie path is exercised —
+plain-HTTP checks are limited to non-auth surface (`/healthz`, unauth redirect,
+env fail-fast). See [research.md](./research.md) R11 and
+[quickstart.md](./quickstart.md).
 
 **Target Platform**: Linux/amd64 container (small x86 mini-PC). Single replica
 behind a separately-operated HTTPS reverse proxy. Reached ~98% from mobile
@@ -79,23 +83,25 @@ Constitution version 1.0.0. Each principle → how this plan complies.
 | I | Curated mobile-first single-host directory, external only via existing HTTPS reverse proxy | Scope matches exactly; no multi-host, no monitoring; reverse proxy is external + separately operated (acceptance gate). |
 | II | SvelteKit + TS + adapter-node; simplicity over infra | Exactly that stack; **no DB/queue/worker**; every dependency justified in research.md; visuals CSS-only. |
 | III | Own Compose project; no media-stack lifecycle change beyond documented `homemedia.*` labels | Portal + socket-proxy run as a **separate Compose project** in their own directory. Only change to existing services = adding `homemedia.*` labels, applied via the server's documented process and logged there (implementation-phase task). See "Deviation note" below. |
-| IV | Read-only Docker only via digest-pinned socket proxy; never raw socket or mutation | `docker-socket-proxy` digest-pinned, `CONTAINERS=1`, `POST=0`, all mutation groups at default `0`; raw socket mounted **only** into the proxy; portal speaks HTTP to `:2375`. Contract in [contracts/docker-api-contract.md](./contracts/docker-api-contract.md). |
+| IV | Read-only Docker only via digest-pinned socket proxy; never raw socket or mutation | `docker-socket-proxy` digest-pinned, `CONTAINERS=1`, `POST=0`, all mutation groups at default `0`; raw socket mounted **only** into the proxy; portal reaches it over a private internal-network URL (`DOCKER_PROXY_URL`), GET only. Contract in [contracts/docker-api-contract.md](./contracts/docker-api-contract.md). |
 | V | Opt-in `homemedia.enable=true` discovery; nothing else revealed | Discovery query filters on that label; projection, `/api/services`, SSR, and every empty/error state exclude non-labelled containers. [contracts/label-contract.md](./contracts/label-contract.md). |
 | VI | No Watchtower; no mutable deployed tags; manual rollback-capable updates | Deploy design pins portal + proxy by `@sha256`; documented promote/rollback procedure mirrors the server runbook's update flow; no auto-updater. |
 | VII | Public registry, no server-side credential | Image published to public GHCR; server pulls anonymously; nothing secret in the image. |
 | VIII | No ufw/WireGuard/router/firewall changes; portal binds configured private origin | Plan changes none of these; portal binds the deployment-configured private origin:port; reverse proxy elsewhere. |
 | IX | No secrets/plaintext in repo/specs/issues/CI/examples/image; Argon2id + `__Host-` cookie | Password supplied only as an env-var Argon2id hash; `SESSION_SECRET` env only; `env.ts` fails fast; `.gitignore` covers `PRIVATE-CONTEXT.md` + `*.local.*`; disclosure gate below. |
 | X | PWA caches static assets only | Service worker precaches `build`+`files` only; fetch handler is network-only for everything else; verified in quickstart. |
-| XI | v1 fences: no probing/polling/WebGL/parallax/OAuth/API-key/AI-control API; status from Docker state only | None present. Status = `State`/`State.Health` only, computed on load + manual refresh. Future API rule restated in the spec, not implemented. |
+| XI | v1 fences: no probing/polling/WebGL/parallax/OAuth/API-key/AI-control API; status from Docker state only | None present. Status = `State`/`State.Health` only, computed on load + manual refresh; the two Docker failure modes (FR-030) never fabricate/cache/retain a list. Future API rule restated in the spec, not implemented. |
 | XII | Tests/verification evidence + doc updates; never `down -v` | Every implementation task will carry tests/evidence; `docs/deployment.md` uses `docker compose stop`; rollback documented; server-doc updates listed as implementation tasks. |
 
 ### Required validation gates (must be green at plan time and re-checked post-design)
 
 1. **Public-repository disclosure** — no LAN IP, hostname/FQDN, port number,
-   absolute server path, proxy topology, or enumerated service inventory in any
-   tracked file (spec, plan, research, data-model, contracts, quickstart, README).
-   Concrete values live only in untracked `PRIVATE-CONTEXT.md`. → **PASS** (grep
-   gate in quickstart + pre-commit review).
+   absolute server path, proxy topology, or enumerated service inventory in **any
+   tracked file** (spec, plan, research, data-model, every `contracts/` file,
+   quickstart, README — no file excluded). Concrete values live only in untracked
+   `PRIVATE-CONTEXT.md`. Verified by a **whole-tracked-tree** scan
+   ([quickstart.md](./quickstart.md) §"disclosure & secrets gate") with no
+   `:!path` exclusion, plus pre-commit review. → **PASS**.
 2. **Secrets** — no plaintext password, session secret, hash, or token in any
    tracked file, commit message, or image layer; password and `SESSION_SECRET`
    are runtime env only; `env.ts` refuses to start without them. → **PASS**.
@@ -119,8 +125,9 @@ amendment is required.
 
 ### Server-document conflict check
 
-`home-server-setup.md` and `/srv/compose/RUNBOOK.md` were reviewed against the
-approved Constitution and spec. Findings:
+The server's private operational documents (the host setup notes and the
+operations runbook) were reviewed against the approved Constitution and spec.
+Findings:
 
 - No mutable tags / no Watchtower / manual digest updates / `docker compose stop`
   (never `down -v`) / no `ufw` — **all consistent** with Constitution VI, VIII, XII.
@@ -134,12 +141,17 @@ approved Constitution and spec. Findings:
 
 ### Post-Phase-1 re-check
 
-After the design artifacts below were produced, the table above and the four gates
-were re-evaluated. No new violations introduced: the route/authorization model
-(contracts) keeps `/healthz` the only unauthenticated non-static route and never
-emits non-labelled services; the data model holds no persistent store; the Docker
-contract is GET-only on `CONTAINERS`. **Constitution Check: PASS (pre- and
-post-design).** Complexity Tracking table is empty.
+After the design artifacts below were produced — and again after the 2026-08-30
+plan-review corrections (whole-tree disclosure gate, local-HTTPS cookie validation
+per research R11, and the FR-030 discovery-vs-status split) — the table above and
+the four gates were re-evaluated. No new violations introduced: the
+route/authorization model (contracts) keeps `/healthz` the only unauthenticated
+non-static route and never emits non-labelled services; the data model holds no
+persistent store and never fabricates/caches/retains a service list; the Docker
+contract is GET-only on `CONTAINERS`; the session cookie keeps its production
+`Secure`/`__Host-` attributes (local HTTPS is a test-harness concern only). **The
+whole-tracked-tree disclosure + secrets scan is clean.** **Constitution Check:
+PASS (pre- and post-design).** Complexity Tracking table is empty.
 
 ## Project Structure
 
@@ -178,7 +190,7 @@ src/
 │   │   │   ├── session.ts         # sign / verify HMAC cookie; 30-day exp
 │   │   │   └── rate-limit.ts      # in-memory sliding-window per client IP
 │   │   ├── docker/
-│   │   │   ├── client.ts          # fetch wrapper for socket-proxy :2375 (GET only)
+│   │   │   ├── client.ts          # fetch wrapper for DOCKER_PROXY_URL (GET only)
 │   │   │   ├── discovery.ts       # list containers filtered by homemedia.enable
 │   │   │   └── status.ts          # State/Health → up|down|unknown mapping
 │   │   ├── labels.ts              # parse homemedia.* → LabelSet + defaults
@@ -239,10 +251,12 @@ real values stay in untracked `PRIVATE-CONTEXT.md`.
      ports.
   2. `portal` — public GHCR image digest-pinned; env: `ORIGIN`,
      `PROTOCOL_HEADER`, `HOST_HEADER`, `ADDRESS_HEADER=x-forwarded-for`,
-     `XFF_DEPTH=1`, `BODY_SIZE_LIMIT=64K`, `PORT=3000`, `DOCKER_PROXY_URL`,
-     `PORTAL_USERNAME`, `PORTAL_PASSWORD_ARGON2`, `SESSION_SECRET`,
-     `SERVICE_LINK_BASE` (host template for `homemedia.port`). Publishes its port
-     to the configured private origin address only. `restart: unless-stopped`.
+     `XFF_DEPTH=1`, `BODY_SIZE_LIMIT` (small), `PORT`/`HOST` (adapter-node
+     defaults), `DOCKER_PROXY_URL`, `PORTAL_USERNAME`, `PORTAL_PASSWORD_ARGON2`,
+     `SESSION_SECRET`, `SERVICE_LINK_BASE` (host template for `homemedia.port`).
+     Publishes its port to the configured private origin address only.
+     `restart: unless-stopped`. Concrete addresses/ports live only in the
+     operator's untracked notes.
 - **Secrets** come from an operator-managed env file that is **not** in the repo.
 - **Images**: built by CI, pushed to public GHCR as `:sha-<short>` and a semver
   tag; the deployed Compose file pins `@sha256:…`. No `:latest` in deployment.

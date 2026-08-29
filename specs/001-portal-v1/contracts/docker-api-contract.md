@@ -8,7 +8,8 @@ non-`GET` request. This contract is normative and testable.
 
 ## Calls the portal makes
 
-All against `${DOCKER_PROXY_URL}` (an internal `http://…:2375`), `GET` only.
+All against `${DOCKER_PROXY_URL}` (an internal-network `http://` URL; concrete
+host/port is deployment config, not recorded here), `GET` only.
 
 ### 1. Discovery
 
@@ -16,8 +17,7 @@ All against `${DOCKER_PROXY_URL}` (an internal `http://…:2375`), `GET` only.
 GET /containers/json?all=1&filters={"label":["homemedia.enable=true"]}
 ```
 
-- `all=1` so stopped containers are included (they must still be listed, FR/SC-009,
-  SC-010).
+- `all=1` so stopped containers are included (they must still be listed, SC-010).
 - `filters` label-scopes the result server-side; code **also** re-checks
   `Labels["homemedia.enable"]` truthiness (defence in depth for Constitution V).
 
@@ -32,11 +32,18 @@ GET /containers/{id}/json
 Fields read: `State.Status`, `State.Health.Status` (absent when the container
 defines no healthcheck). Nothing else is consumed.
 
-### Timeouts
+### Timeouts and failure modes (spec FR-030)
 
-- Per call: 2 s. Overall Docker-read budget for one dashboard load: 4 s.
-- On any timeout/error/non-2xx: treat as `unknown` (per-container) or
-  `sourceOk = false` (discovery). Never blocks the response beyond the budget.
+- Short per-call timeout and an overall dashboard-load budget (concrete values are
+  an implementation tuning detail); the response never blocks beyond the budget.
+- **Discovery call (step 1) fails, times out, non-2xx, or proxy unreachable** →
+  `sourceOk = false`. The portal returns **no service list** and the UI shows an
+  explicit "directory unavailable" state. Nothing is fabricated, cached, or
+  retained. (SC-015)
+- **Discovery succeeds but a step-2 inspect fails/times out for a container** →
+  `sourceOk = true`; that one service is `status = 'unknown'` ("Status
+  unavailable"); all other discovered services are listed with their real status.
+  (SC-009)
 
 ### Not used
 
@@ -72,5 +79,8 @@ with the portal, raw Docker socket bind-mounted **only** here.
    `GET /containers/json?filters=…` and from the portal on next load — and the
    portal never calls any endpoint that would reveal it.
 4. Stopping the proxy (or pointing `DOCKER_PROXY_URL` at nothing) makes the
-   dashboard render the "status unavailable" state within the 4 s budget, still
-   with no crash and no leak.
+   dashboard render the explicit "directory unavailable" state (no list) within the
+   load budget, with no crash and no leak (SC-015).
+5. Failing only the per-container inspects (proxy up, `CONTAINERS` list works,
+   inspect returns errors) makes the dashboard list every discovered service with
+   status "Status unavailable" (SC-009).

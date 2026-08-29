@@ -66,9 +66,15 @@ are relative to it. Behaviour below is normative for implementation and tests.
     text, description, "LAN only" badge where `lanOnly`), each card an `<a>` to
     `href` opening in a new browsing context; cards with `href === null` render as
     non-links marked "link unconfigured".
-  - empty states: **no labelled services** → friendly "nothing here yet" copy that
-    does not name or count non-labelled containers; **`sourceOk === false`** →
-    "Service status is currently unavailable" notice.
+  - a service whose status could not be derived (discovery succeeded, its inspect
+    failed) is **still listed**, with the status shown as "Status unavailable"
+    (spec FR-030, SC-009).
+  - states (spec FR-030):
+    - **no labelled services exist** → friendly "nothing here yet" copy that does
+      not name or count non-labelled containers.
+    - **`sourceOk === false`** (labelled-service discovery itself failed) → an
+      explicit "The service directory is currently unavailable" state, **no service
+      list at all**; nothing fabricated, cached, or retained (SC-015).
 - **Headers**: `Cache-Control: no-store`; CSP + security headers.
 - **MUST**: exclude every container without `homemedia.enable=true` from markup and
   embedded data (no hidden `<script>` payload leak).
@@ -82,9 +88,12 @@ are relative to it. Behaviour below is normative for implementation and tests.
 - **Purpose**: let the open dashboard refresh its data on an explicit user action
   (a "refresh" control) without a full navigation. **Not polled**; the client makes
   this call only in response to a user gesture (FR-016).
-- **Response 200** `application/json`: the `DashboardModel` object.
-- **Response 200 with `sourceOk:false`**: Docker read failed; `categories: []`,
-  `counts` all zero. HTTP is still 200 (the portal is fine; the source is not).
+- **Response 200** `application/json`: the `DashboardModel` object. When discovery
+  succeeded, `sourceOk:true` and every discovered labelled service appears; any
+  whose status could not be derived carry `status:"unknown"` (SC-009).
+- **Response 200 with `sourceOk:false`**: labelled-service **discovery** failed;
+  `categories: []`, `counts` all zero. HTTP is still 200 (the portal is fine; the
+  source is not). No list is fabricated, cached, or retained (SC-015).
 - **Headers**: `Cache-Control: no-store`.
 - **MUST NOT**: be cached by the service worker; MUST NOT include non-labelled
   containers or raw Docker fields.

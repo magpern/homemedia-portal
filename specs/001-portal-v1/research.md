@@ -18,7 +18,9 @@ addresses, hostnames, ports, server paths, or service names appear here.
   - `ADDRESS_HEADER=x-forwarded-for`
   - `XFF_DEPTH=1` (exactly one trusted proxy in front).
   - `BODY_SIZE_LIMIT=64K` (portal only accepts a tiny login form; default is 512K).
-  - `HOST=0.0.0.0`, `PORT=3000` inside the container.
+  - `HOST` = all interfaces, `PORT` = `<CONTAINER_PORT>` (the Node adapter's
+    documented default) inside the container. Concrete values live only in the
+    operator's untracked notes.
 - The reverse proxy MUST send `X-Forwarded-Proto`, `X-Forwarded-Host`, and a
   single-hop `X-Forwarded-For`. If it cannot, `ORIGIN` alone still fixes URL
   generation but client-IP attribution degrades (see R4).
@@ -29,7 +31,7 @@ addresses, hostnames, ports, server paths, or service names appear here.
   exactly the trusted proxies; this prevents a client pre-seeding a spoofed chain.
 - The adapter docs explicitly warn that `PROTOCOL_HEADER`/`HOST_HEADER` must only be
   set "if your server is behind a trusted reverse proxy; otherwise, it'd be
-  possible for clients to spoof these headers." The portal's origin port is not
+  possible for clients to spoof these headers." The portal's origin is not
   routable from the public internet, and the trusted-LAN caveat is recorded in the
   spec, so this condition holds.
 - Getting `ORIGIN`/`PROTOCOL_HEADER`/`HOST_HEADER` right is also required for
@@ -54,7 +56,8 @@ Source: SvelteKit — Node adapter (`svelte.dev/docs/kit/adapter-node`), Configu
 
 - Session cookie name: `__Host-hmp_session`.
 - Attributes: `Secure; Path=/; HttpOnly; SameSite=Lax`; **no `Domain`**.
-- Set only over HTTPS (guaranteed via the reverse proxy + `ORIGIN`).
+- Set only over HTTPS (guaranteed in production via the reverse proxy + `ORIGIN`;
+  validated locally / in CI behind a local TLS terminator — see R11).
 - `Max-Age` = exactly 30 days (2 592 000 s); the signed payload also carries an
   absolute `exp` and is the authority (R5).
 
@@ -165,7 +168,7 @@ Source: SvelteKit — `RequestEvent.getClientAddress`, Node adapter `ADDRESS_HEA
 **Rationale**
 
 - OWASP names Argon2id first choice with that exact minimum; `m=19456,t=2,p=1` is
-  the lowest-RAM row of the equivalent-defence set and fits a small NUC.
+  the lowest-RAM row of the equivalent-defence set and fits a small mini-PC.
 - `hash-wasm` avoids `node-gyp`/prebuild-download supply-chain surface and works
   identically across build and runtime.
 - Node's built-in `crypto` (HMAC + `timingSafeEqual`) covers signing with zero
@@ -202,14 +205,15 @@ docs (`createHmac`, `timingSafeEqual`); `hash-wasm` project README.
     `GRPC` at their default `0`.
   - `EVENTS`, `PING`, `VERSION` are `1` by default; they are harmless read-only
     endpoints. The portal only calls the container endpoints; the proxy manifest
-    lists these three explicitly in `docs/deployment.md` so the posture is
-    auditable, and `EVENTS`/`VERSION` MAY be set to `0` since the portal does not
-    use them (`PING` is convenient for the proxy's own healthcheck).
+    lists these three explicitly in the operator's deployment notes so the posture
+    is auditable, and `EVENTS`/`VERSION` MAY be set to `0` since the portal does
+    not use them (`PING` is convenient for the proxy's own healthcheck).
 - The proxy container: `read_only: true`, `no-new-privileges`, `cap_drop: [ALL]`,
   no ports published to the host, on a dedicated internal network shared only with
   the portal. The **raw Docker socket is mounted only into the proxy**, read-side.
-- The portal connects with `DOCKER_PROXY_URL` = `http://<proxy-service>:2375`
-  (plain HTTP on an internal Docker network; no TLS).
+- The portal connects via `DOCKER_PROXY_URL` (an internal `http://` URL on a
+  private Docker network; no TLS). The concrete host and port are deployment
+  configuration and live only in the operator's untracked notes.
 
 **Rationale**
 
@@ -231,7 +235,7 @@ docs (`createHmac`, `timingSafeEqual`); `hash-wasm` project README.
 - Portainer's API: rejected — heavier, and grants far more than list/inspect.
 
 Source: Tecnativa `docker-socket-proxy` README (environment variables, "read-only"
-behaviour, port 2375); Docker Engine API reference (`/containers/json`,
+behaviour, its TCP listen port); Docker Engine API reference (`/containers/json`,
 `/containers/{id}/json`).
 
 ---
@@ -375,7 +379,7 @@ Sources: W3C WCAG 2.1 (1.4.3 Contrast Minimum, 1.4.11 Non-text Contrast, 2.5.5 /
 - Discovery call: `GET /containers/json?all=1&filters={"label":["homemedia.enable=true"]}`.
 - Status call (per discovered container): `GET /containers/{id}/json`, read
   `.State.Status` and `.State.Health.Status`.
-- Mapping to the three spec states:
+- Per-service status mapping (spec FR-015):
   | Inspect result | Portal status |
   |---|---|
   | `Health.Status = healthy` | `up` |
@@ -383,19 +387,31 @@ Sources: W3C WCAG 2.1 (1.4.3 Contrast Minimum, 1.4.11 Non-text Contrast, 2.5.5 /
   | `Health.Status = starting` | `unknown` (labelled "starting") |
   | no healthcheck, `State.Status = running` | `up` |
   | no healthcheck, `State.Status` ∈ {exited, dead, created, paused, restarting} | `down` |
-  | discovery or inspect call fails / proxy unreachable | `unknown` for every service ("status unavailable", SC-009) — services still listed |
+  | this container's inspect call fails / times out | `unknown` (labelled "Status unavailable") — this service is still listed |
+- **Two distinct failure modes** (product-owner decision 2026-08-30, spec FR-030):
+  - **Discovery succeeds, some inspects/status-derivations fail** → list every
+    discovered labelled service; the affected ones show `unknown` /
+    "Status unavailable"; unaffected ones show their real status (`sourceOk = true`).
+  - **Discovery itself fails / proxy unreachable** → `sourceOk = false`: the
+    dashboard shows an explicit "service directory is currently unavailable" state
+    and **no service list**. The portal MUST NOT fabricate, cache, or retain a
+    list (v1 has no persistence).
 - Status is computed at page load (`+page.server.ts`) and on demand via
   `GET /api/services`. **No polling, no background loop, no HTTP probe of the
   service itself** (FR-016).
-- A short server-side timeout (e.g. 2 s per call, 4 s overall budget) so a hung
-  daemon does not hang the dashboard — on timeout, `unknown`.
+- Short server-side timeouts (per call and an overall dashboard-load budget) so a
+  hung daemon does not hang the dashboard — on timeout, the same two-mode rule
+  applies (discovery timeout → `sourceOk = false`; per-inspect timeout → that
+  service `unknown`).
 
 **Rationale**
 
 - `State` + `State.Health` are exactly the signals the spec allows and are present
   on the standard inspect payload; no extra endpoints or capabilities needed.
-- Failing closed to `unknown` (not `down`) while still listing every service
-  satisfies SC-009 and avoids a false "everything's down" alarm.
+- Failing a single inspect closed to `unknown` (not `down`) while still listing the
+  service satisfies FR-030 / SC-009 and avoids a false "everything's down" alarm.
+- Failing discovery closed to "no list" (rather than an empty or stale list)
+  satisfies FR-030 / SC-015 and never misrepresents the directory.
 
 **Alternatives considered**
 
@@ -409,6 +425,71 @@ Source: Docker Engine API reference — `GET /containers/json` (filters),
 
 ---
 
+## R11. Validating the `Secure` / `__Host-` session cookie locally and in CI
+
+**Problem**
+
+The production session cookie is `__Host-hmp_session` with `Secure` (R2). A real
+browser will not store or return a `Secure` / `__Host-` cookie over plain `http://`
+except on the special `http://localhost` trustworthy origin — and even there the
+behaviour is browser-version dependent and `curl` will refuse to send it. So
+authentication and session flows **cannot** be validated over plain HTTP without
+weakening the cookie, which is forbidden.
+
+**Decision**
+
+Split validation into two tiers, and add a third as part of the existing gate:
+
+1. **Non-auth checks over plain HTTP** (`curl`, scripts): liveness (`/healthz`),
+   the unauthenticated redirect from `/`, env fail-fast, build/image sanity,
+   static-cache inspection. These never touch the session cookie.
+2. **Auth / session checks over local HTTPS**: run the built adapter-node server on
+   a loopback port, put a **throwaway local TLS reverse proxy in front of it**, and
+   point the browser test runner at the `https://` origin. Primary tool:
+   **Caddy** (`caddy reverse-proxy --from https://localhost --to <loopback:port>`),
+   which provisions and installs a local CA automatically, so the browser trusts
+   the cert with no flags. Set the server's `ORIGIN` to that `https://localhost`
+   origin. Playwright then exercises the real `Secure` / `__Host-` cookie path
+   (set on login, sent back on navigation, cleared on logout, rejected after
+   `exp`, rejected after `SESSION_SECRET` rotation).
+   - Fallback if Caddy is unavailable: `npx local-ssl-proxy` (self-signed) plus
+     Playwright `ignoreHTTPSErrors: true` — the origin is still `https://`, so it is
+     a secure context and the cookie path is still exercised; only cert trust is
+     bypassed.
+3. **Production truth**: full browser-session validation on a real device is also
+   an explicit item of the **HTTPS reverse-proxy acceptance gate**
+   ([quickstart.md](./quickstart.md) §"reverse-proxy acceptance gate"). The real
+   `__Host-` cookie over the real hostname is only *confirmed* there.
+
+No production exception, no insecure-cookie mode, no alternate cookie name or
+weakened attributes are introduced. Local HTTPS is a test-harness concern only.
+
+**Rationale**
+
+- A local TLS terminator reproduces the exact production topology (HTTPS proxy →
+  plain-HTTP adapter-node) so the forwarded-header + `Secure` cookie behaviour is
+  tested as it will actually run.
+- Caddy's automatic local CA keeps the harness to one command with no committed
+  cert material (nothing to leak, nothing to expire in the repo).
+- Keeping tier 1 explicitly cookie-free removes the temptation to "just test login
+  over http on localhost", which is exactly the fragile path to avoid.
+
+**Alternatives considered**
+
+- `vite dev --https` / `@vitejs/plugin-basic-ssl`: works for the dev server but not
+  for validating the **built** adapter-node output; kept only for component-level
+  dev.
+- Relaxing to `__Secure-` or dropping `Secure` for a "dev mode": rejected —
+  forbidden by the task and by Constitution IX; also would not test the real path.
+- Committing an `mkcert` cert/key into the repo: rejected — key material in a public
+  repo.
+
+Sources: MDN — cookie prefixes / `Secure` and "potentially trustworthy origins";
+Caddy docs — `caddy reverse-proxy` and automatic local HTTPS / local CA; Playwright
+docs — `ignoreHTTPSErrors`, `webServer`.
+
+---
+
 ## Consolidated dependency list (for the plan)
 
 | Purpose | Choice | Note |
@@ -417,10 +498,12 @@ Source: Docker Engine API reference — `GET /containers/json` (filters),
 | Server runtime | `@sveltejs/adapter-node`, Node 22 LTS | base image digest-pinned |
 | Password hash | `hash-wasm` (Argon2id) | no native toolchain |
 | Session signing | Node `crypto` (stdlib) | HMAC-SHA256 |
-| Docker read | native `fetch` → socket-proxy `:2375` | no client library |
+| Docker read | native `fetch` → socket-proxy over `DOCKER_PROXY_URL` | no client library |
 | Env validation | hand-rolled `env.ts` | `valibot` acceptable alternative |
 | Unit tests | `vitest` | |
 | E2E + a11y | `@playwright/test` + `@axe-core/playwright` | + Lighthouse for PWA signal |
+| Local HTTPS for auth e2e | `caddy` (CLI, local CA) or `local-ssl-proxy` fallback | **test harness only** — not a runtime dependency, not in the image (R11) |
 | Types/lint | `svelte-check`, `eslint`, `prettier` | |
 
-No database, cache server, queue, or background worker (Constitution II).
+No database, cache server, queue, or background worker (Constitution II). The local
+TLS terminator is a developer/CI tool, never shipped or deployed.

@@ -95,16 +95,22 @@ Single pure function `deriveStatus(inspect | error) → { status, statusLabel }`
 | `Health.Status === 'starting'` | `unknown` | "Starting" |
 | no healthcheck & `State.Status === 'running'` | `up` | "Running" |
 | no healthcheck & `State.Status` ∈ {`exited`,`dead`,`created`,`paused`,`restarting`} | `down` | "Not running" |
-| discovery/inspect call failed, timed out, or proxy unreachable | `unknown` | "Status unavailable" |
+| **this container's** inspect call failed or timed out | `unknown` | "Status unavailable" |
 
-Rules:
+### Failure modes (product-owner decision 2026-08-30, spec FR-030)
 
-- Failure is **per whole read**: if the discovery call fails, the dashboard still
-  renders every *previously known*? No — v1 has no persistence, so on a failed
-  discovery call the dashboard shows a single top-level "status unavailable"
-  notice and no tiles (there is nothing to list). If discovery succeeds but a
-  per-container inspect fails, that service is `unknown`; others are unaffected
-  (SC-009).
+Two clearly separated cases:
+
+1. **Discovery succeeded; one or more inspects / status derivations failed.**
+   `sourceOk = true`. Every discovered labelled service is listed. Services whose
+   state could not be determined show `status = 'unknown'` / "Status unavailable";
+   the rest show their real status. (spec FR-030, SC-009)
+2. **Discovery itself failed (or the proxy was unreachable / timed out on the
+   list call).** `sourceOk = false`. `categories = []`, all `counts` zero. The UI
+   renders an explicit "service directory is currently unavailable" state. The
+   portal MUST NOT fabricate, cache, or retain a service list — v1 has no
+   persistence, so there is simply nothing to show. (spec FR-030, SC-015)
+
 - No value is ever inferred from an HTTP probe of the service (FR-016).
 
 ---
@@ -128,15 +134,19 @@ whitespace differences) collapse into one via `key` (edge case in spec).
 ```
 {
   generatedAt: string (ISO 8601),
-  sourceOk: boolean,            // false → discovery read failed
-  categories: Category[],       // empty when sourceOk=false or no labelled services
+  sourceOk: boolean,            // false ONLY when labelled-service DISCOVERY failed
+  categories: Category[],       // [] when sourceOk=false, or when no labelled services exist
   counts: { services: number, up: number, down: number, unknown: number }
 }
 ```
 
-Never includes any container that lacks `homemedia.enable=true`. Never includes raw
-Docker fields, container ids, image names, or host/port internals beyond the
-resolved `href`.
+- `sourceOk = false` means **discovery failed** → no list is produced (case 2
+  above). A failed *per-container* inspect does **not** set `sourceOk = false`; it
+  only makes that one service `unknown` (case 1).
+- `counts.unknown` includes services in case 1 whose status could not be derived.
+- Never includes any container that lacks `homemedia.enable=true`. Never includes
+  raw Docker fields, container ids, image names, or host/port internals beyond the
+  resolved `href`.
 
 ---
 
@@ -189,12 +199,12 @@ Client IP from `event.getClientAddress()` (honours `ADDRESS_HEADER` + `XFF_DEPTH
 | `PORTAL_USERNAME` | yes | non-empty | shared login name |
 | `PORTAL_PASSWORD_ARGON2` | yes | parses as a PHC Argon2id string | never logged |
 | `SESSION_SECRET` | yes | ≥ 32 bytes after decoding | never logged; rotate → global logout |
-| `DOCKER_PROXY_URL` | yes | absolute `http(s)` URL | e.g. internal `http://host:2375` |
+| `DOCKER_PROXY_URL` | yes | absolute `http(s)` URL | internal-network URL of the socket-proxy; concrete value in operator notes only |
 | `SERVICE_LINK_BASE` | no | host template if present | enables `homemedia.port` links |
-| `ORIGIN` | yes (prod) | absolute `https` URL | adapter-node |
+| `ORIGIN` | yes (prod) | absolute `https` URL | adapter-node; local test = a local `https://` origin (research R11) |
 | `PROTOCOL_HEADER` / `HOST_HEADER` / `ADDRESS_HEADER` / `XFF_DEPTH` | recommended | adapter-node forwarded-header config |
-| `BODY_SIZE_LIMIT` | no | default `64K` | |
-| `PORT` / `HOST` | no | defaults `3000` / `0.0.0.0` | |
+| `BODY_SIZE_LIMIT` | no | small default | |
+| `PORT` / `HOST` | no | adapter-node defaults (loopback-testable) | concrete values in operator notes only |
 
 `env.ts` throws and the process exits non-zero if any required value is missing or
 invalid — no silent defaulting of secrets.
