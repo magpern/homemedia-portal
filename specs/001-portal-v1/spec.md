@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-29
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "Portal v1 — a curated, mobile-first internal service
 directory for one private home server, reached from a phone through an existing
@@ -28,10 +28,10 @@ reads service state in a read-only way and never controls anything.
 
 ### Session 2026-08-30
 
-The ambiguity scan surfaced eight decision points. They were carried into the
-specification pull-request review and the product owner has now decided them. They
-are recorded here and folded into the affected requirements; the acceptance gate
-below is unchanged.
+The ambiguity scan surfaced eight decision points, decided at the specification
+pull-request review; a ninth (Docker-read partial-failure behaviour) was decided at
+the implementation-plan review on 2026-08-30. All are recorded here and folded into
+the affected requirements; the acceptance gate below is unchanged.
 
 - Q: Does the HTTPS reverse-proxy route to the portal exist, and should this
   project provision it? → A: Intended architecture uses the **existing estate
@@ -58,6 +58,13 @@ below is unchanged.
   bundled subset of Dashboard Icons**. The Plan phase must verify its current
   licence and include the required attribution/licence notice. **No icon is fetched
   at runtime.**
+- Q: When the Docker read partly fails, what does the dashboard show? → A: **Two
+  distinct cases.** If **labelled-service discovery succeeds** but one or more
+  subsequent container inspections / status derivations fail: **list every
+  discovered labelled service and show the affected ones with status
+  unavailable/unknown**. If **labelled-service discovery itself fails**: show an
+  **explicit source-unavailable state and do not fabricate, cache, or retain a
+  service list** (v1 has no persistence).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -90,6 +97,14 @@ indicator; tap a tile and confirm the configured destination opens.
 5. **Given** a container with no `homemedia.enable=true` label, **When** the
    dashboard loads, **Then** that service never appears anywhere in the UI or its
    data.
+6. **Given** the labelled services are discovered but the status of one cannot be
+   read, **When** the dashboard loads, **Then** every discovered service is still
+   listed and the affected one shows "status unavailable" while the others show
+   real status.
+7. **Given** the portal cannot retrieve the list of labelled services at all,
+   **When** the dashboard loads, **Then** it shows an explicit "service directory
+   unavailable" state with no service list, and reloading while still unavailable
+   never shows a stale list.
 
 ---
 
@@ -205,9 +220,14 @@ success response when the portal is serving.
 
 ### Edge Cases
 
-- **Docker information source unavailable**: the portal cannot read container
-  state — it presents an explicit "status unavailable" state rather than implying
-  everything is down or hiding services.
+- **Labelled-service discovery fails** (the portal cannot even get the list of
+  labelled containers): the portal presents an explicit "service directory
+  unavailable" state and shows **no service list**; it does not fabricate, cache,
+  or retain one.
+- **Discovery succeeds but some status reads fail**: the portal lists every
+  discovered labelled service; the ones whose state could not be determined show
+  "status unavailable"; the rest show their real status. It never implies
+  everything is down and never hides a discovered service.
 - **A labelled service exposes several ports / no obvious port**: presentation
   falls back to an explicit label value; if still ambiguous the tile indicates the
   link is unconfigured rather than guessing.
@@ -284,6 +304,13 @@ success response when the portal is serving.
 - **FR-015**: The portal MUST show each service's current status derived **only**
   from container state and container healthcheck results, with at minimum the
   distinct states: running/healthy, not running, and status-unavailable.
+- **FR-030**: The portal MUST distinguish two Docker-read failure modes:
+  (a) **discovery succeeds, individual status reads fail** → the portal MUST still
+  list every discovered labelled service, showing status-unavailable for those
+  whose state could not be determined and real status for the rest;
+  (b) **labelled-service discovery itself fails** → the portal MUST show an explicit
+  source-unavailable state with no service list, and MUST NOT fabricate, cache, or
+  retain a service list.
 - **FR-016**: The portal MUST NOT perform HTTP or uptime probing of services and
   MUST NOT poll in the background or stream status in v1; status reflects the state
   at page load, refreshable by an explicit user action.
@@ -356,9 +383,14 @@ success response when the portal is serving.
   interactive targets are ≥44×44 px.
 - **SC-007**: With reduced-motion enabled, no non-essential animation plays.
 - **SC-008**: The portal passes standard mobile "installable PWA" checks.
-- **SC-009**: When the container-state source is unavailable, the portal still
-  lists every labelled service and shows a status-unavailable state (it never
-  shows a false "all down" or hides services).
+- **SC-009**: When discovery succeeds but one or more status reads fail, the portal
+  still lists every discovered labelled service and shows a status-unavailable
+  state for the affected ones (it never shows a false "all down" and never hides a
+  discovered service).
+- **SC-015**: When labelled-service discovery itself fails, the portal shows an
+  explicit source-unavailable state with no service list, and no service list is
+  fabricated, cached, or retained (verifiable: reload while the source is down
+  never produces a stale list).
 - **SC-010**: Stopping a labelled service is reflected as "not running" after an
   explicit refresh of the dashboard.
 - **SC-011**: A wrong-password attempt returns a generic failure; a sixth failed
@@ -439,6 +471,7 @@ All prior open questions are resolved; details and the exact wording are in
 | 6 | Login throttle: **5 failures / rolling 15 min / client, then 15-min cool-off** (FR-005); best-effort, not a substitute for edge protection. |
 | 7 | **One shared household password** is sufficient for v1; per-user accounts remain out of scope. |
 | 8 | Icons are a **locally bundled subset of Dashboard Icons** (FR-012); the Plan phase verifies the licence and adds the required attribution; no runtime fetch. |
+| 9 | *(plan review, 2026-08-30)* Docker-read partial failure: discovery OK + status reads fail → list all discovered services, mark affected ones status-unavailable (FR-030(a), SC-009); discovery itself fails → explicit source-unavailable state, no list, nothing fabricated/cached/retained (FR-030(b), SC-015). |
 
 No open questions remain for Portal v1. The reverse-proxy route stays an external
 acceptance gate to be verified before external access is accepted.

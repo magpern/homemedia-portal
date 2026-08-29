@@ -45,3 +45,23 @@
   constitution, not implementation choice; no framework, language, or library is named.
 - Tracked files reviewed for disclosure: no private IPs, hostnames/FQDNs, ports, server
   paths, or service inventory appear in `spec.md` or this checklist.
+
+### 2026-08-30 (plan-review re-run — after PR #2 corrections)
+
+Re-ran the full checklist against the updated `spec.md` (added: 9th clarification;
+FR-030; SC-015; SC-009 revised; US1 scenarios 6–7; edge-case split; Product-Owner
+Decisions row 9). Result: **all 16 items still pass.**
+
+- No implementation details: unchanged — FR-030 / SC-015 describe observable
+  behaviour ("list every discovered service", "no service list", "nothing
+  fabricated/cached/retained"), no tech.
+- Testable & unambiguous: the two Docker-read failure modes are now explicitly
+  separated with distinct, checkable outcomes; the reload-shows-no-stale-list check
+  in SC-015 is directly verifiable.
+- Scenarios defined / edge cases identified: US1 gained two acceptance scenarios;
+  the single "source unavailable" edge case was split into the discovery-fails vs.
+  status-reads-fail cases.
+- Success criteria measurable & technology-agnostic: SC-009 (partial) and SC-015
+  (discovery) are both observable outcomes.
+- No new open questions. Disclosure scan (authored-tree, no artifact excluded —
+  `quickstart.md` included) is clean.
