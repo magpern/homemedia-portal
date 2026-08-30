@@ -27,6 +27,14 @@ export const DEFAULT_CATEGORY = 'Services';
 /** Default sort weight when `homemedia.order` is absent or malformed. */
 export const DEFAULT_ORDER = 100;
 
+/**
+ * Inclusive bounds of `homemedia.port` — the whole TCP port space
+ * (a 16-bit unsigned integer, excluding 0), per `contracts/label-contract.md` /
+ * `data-model.md` §2. Derived from the port-number width, not a deployment port.
+ */
+export const MIN_PORT = 1;
+export const MAX_PORT = 2 ** 16 - 1;
+
 /** Parsed, validated `homemedia.*` labels for one container (data-model §2). */
 export interface LabelSet {
 	/** `homemedia.name`, trimmed — or `null` to use the de-slugified container name. */
@@ -43,7 +51,10 @@ export interface LabelSet {
 	 * and is the only way to reach a non-`http` scheme (data-model §3, decision A).
 	 */
 	url: string | null;
-	/** `homemedia.port` — integer 1–65535, or `null`. Builds an `http`-only link. */
+	/**
+	 * `homemedia.port` — integer in the {@link MIN_PORT}–{@link MAX_PORT} range, or
+	 * `null`. Builds an `http`-only link (never `https`).
+	 */
 	port: number | null;
 	/** `homemedia.order` — any integer; malformed → {@link DEFAULT_ORDER}. */
 	order: number;
@@ -86,10 +97,10 @@ function parseUrlLabel(value: string | undefined): string | null {
 	return trimmed;
 }
 
-/** An integer in 1–65535 → that number; else `null`. */
+/** An integer in the {@link MIN_PORT}–{@link MAX_PORT} range → that number; else `null`. */
 function parsePortLabel(value: string | undefined): number | null {
 	const n = parseIntegerLabel(value);
-	if (n === null || n < 1 || n > 65535) return null;
+	if (n === null || n < MIN_PORT || n > MAX_PORT) return null;
 	return n;
 }
 

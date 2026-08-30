@@ -6,7 +6,7 @@ import {
 	resolveHref,
 	slugify
 } from '$lib/server/docker/projection';
-import { parseLabels, type LabelSet } from '$lib/server/labels';
+import { MAX_PORT, MIN_PORT, parseLabels, type LabelSet } from '$lib/server/labels';
 import type { DerivedStatus } from '$lib/server/docker/status';
 import type { RawContainer } from '$lib/server/docker/types';
 
@@ -23,16 +23,19 @@ const container = (overrides: Partial<RawContainer> = {}): RawContainer => ({
 
 /** A LAN host placeholder — never a real deployment value. */
 const LINK_BASE = 'link-base.invalid';
-/** Arbitrary in-range port numbers; kept in variables so no `host:NNNN` literal is committed. */
-const PORT_A = 3000;
-const PORT_HTTPS_DEFAULT = 443;
-const PORT_TLS_ALT = 8443;
+/**
+ * Valid in-range `homemedia.port` values, derived from the field bounds so no
+ * concrete port literal is committed. `LOW_PORT` is an arbitrary in-range value;
+ * `HIGH_PORT` is the inclusive upper boundary.
+ */
+const LOW_PORT = MIN_PORT + 1;
+const HIGH_PORT = MAX_PORT;
 
 describe('deSlugify — display name default', () => {
 	it.each([
 		['media-alpha', 'Media Alpha'],
-		['sonarr_ui', 'Sonarr Ui'],
-		['jellyfin', 'Jellyfin'],
+		['sample_app_ui', 'Sample App Ui'],
+		['dashboard', 'Dashboard'],
 		['  multi   word  ', 'Multi Word']
 	])('%j → %j', (input, expected) => {
 		expect(deSlugify(input)).toBe(expected);
@@ -79,28 +82,24 @@ describe('resolveHref — data-model §3 precedence (decision A)', () => {
 
 	it('a valid absolute url is used verbatim and wins over port', () => {
 		const href = resolveHref(
-			withLabels({ url: 'https://alpha.invalid/app', port: PORT_TLS_ALT }),
+			withLabels({ url: 'https://alpha.invalid/app', port: LOW_PORT }),
 			LINK_BASE
 		);
 		expect(href).toBe('https://alpha.invalid/app');
 	});
 
-	it('port builds a plain http link with the link base — never https', () => {
-		const href = resolveHref(withLabels({ url: null, port: PORT_A }), LINK_BASE);
-		expect(href).toBe(`http://${LINK_BASE}:${PORT_A}`);
-		expect(href!.startsWith('http://')).toBe(true);
-		expect(href).not.toContain('https');
-	});
-
-	it('an https destination is impossible via port alone (requires homemedia.url)', () => {
-		// Even the standard TLS port only ever yields an http:// link — TLS is never inferred.
-		const href = resolveHref(withLabels({ url: null, port: PORT_HTTPS_DEFAULT }), LINK_BASE);
-		expect(href).toBe(`http://${LINK_BASE}:${PORT_HTTPS_DEFAULT}`);
-		expect(href!.startsWith('http://')).toBe(true);
+	it('port builds a plain http link with the link base — never https, at any port', () => {
+		for (const port of [LOW_PORT, HIGH_PORT]) {
+			const href = resolveHref(withLabels({ url: null, port }), LINK_BASE);
+			// TLS is never inferred — whatever the port number, the scheme is http.
+			expect(href).toBe(`http://${LINK_BASE}:${port}`);
+			expect(href!.startsWith('http://')).toBe(true);
+			expect(href).not.toContain('https');
+		}
 	});
 
 	it('port with no configured link base → null (link unconfigured)', () => {
-		expect(resolveHref(withLabels({ url: null, port: PORT_A }), null)).toBeNull();
+		expect(resolveHref(withLabels({ url: null, port: LOW_PORT }), null)).toBeNull();
 	});
 
 	it('neither url nor port → null', () => {

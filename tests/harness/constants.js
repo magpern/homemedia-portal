@@ -45,3 +45,11 @@ export const E2E_DOCKER_MOCK_ENV = 'HMP_E2E_DOCKER_MOCK_URL';
 
 /** Bare host the dashboard e2e uses to build `homemedia.port` links (never real). */
 export const E2E_SERVICE_LINK_BASE = 'link-base.invalid';
+
+/**
+ * `homemedia.port` field bounds (mirrors `src/lib/server/labels.ts` — the TCP
+ * range, not a deployment port) and an arbitrary in-range value for the
+ * dashboard fixture, derived so no concrete port number is written literally.
+ */
+export const HOMEMEDIA_PORT_MIN = 1;
+export const E2E_FIXTURE_PORT = HOMEMEDIA_PORT_MIN + 1;

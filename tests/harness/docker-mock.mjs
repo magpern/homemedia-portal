@@ -18,10 +18,7 @@
  *                        (FR-030(b) / SC-015: explicit unavailable, no list).
  */
 import { createServer } from 'node:http';
-import { HARNESS_HOST } from './constants.js';
-
-/** A LAN port for the port-link fixture — kept in a variable, never a host:port literal. */
-const PORT_BRAVO = 8123;
+import { E2E_FIXTURE_PORT, HARNESS_HOST } from './constants.js';
 
 /** Container that fails its inspect in `inspect-fail` mode. */
 export const INSPECT_FAIL_ID = 'charlie-archive';
@@ -67,7 +64,7 @@ const CONTAINERS = [
 			'homemedia.name': 'Bravo Admin',
 			'homemedia.category': 'Tools',
 			'homemedia.lan_only': 'true',
-			'homemedia.port': String(PORT_BRAVO)
+			'homemedia.port': String(E2E_FIXTURE_PORT)
 		}
 	},
 	{

@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
 	DEFAULT_CATEGORY,
 	DEFAULT_ORDER,
+	MAX_PORT,
+	MIN_PORT,
 	parseBooleanLabel,
 	parseLabels
 } from '$lib/server/labels';
+
+/** Concrete port numbers are never written literally — only derived from the bounds. */
+const IN_RANGE_PORT = MIN_PORT + 1;
+const BELOW_RANGE = String(MIN_PORT - 1);
+const ABOVE_RANGE = String(MAX_PORT + 1);
 
 /** Only the `homemedia.enable` opt-in gate lives elsewhere (discovery.ts). */
 const enabled = { 'homemedia.enable': 'true' };
@@ -91,17 +98,29 @@ describe('parseLabels — url (decision A: explicit, wins, only path to non-http
 	);
 });
 
-describe('parseLabels — port (1–65535, http-only link built later)', () => {
+describe('parseLabels — port (MIN_PORT..MAX_PORT, http-only link built later)', () => {
 	it('accepts an in-range integer', () => {
-		expect(parseLabels({ ...enabled, 'homemedia.port': '3000' }).port).toBe(3000);
+		expect(parseLabels({ ...enabled, 'homemedia.port': String(IN_RANGE_PORT) }).port).toBe(
+			IN_RANGE_PORT
+		);
 	});
 
-	it.each(['0', '65536', '-1', '80.5', 'abc', '', ' 12 3 '])(
-		'rejects an out-of-range or malformed port %j',
-		(bad) => {
-			expect(parseLabels({ ...enabled, 'homemedia.port': bad }).port).toBeNull();
-		}
-	);
+	it('accepts the inclusive range boundaries', () => {
+		expect(parseLabels({ ...enabled, 'homemedia.port': String(MIN_PORT) }).port).toBe(MIN_PORT);
+		expect(parseLabels({ ...enabled, 'homemedia.port': String(MAX_PORT) }).port).toBe(MAX_PORT);
+	});
+
+	it.each([
+		BELOW_RANGE,
+		ABOVE_RANGE,
+		`-${IN_RANGE_PORT}`,
+		`${IN_RANGE_PORT}.5`,
+		'abc',
+		'',
+		`  ${IN_RANGE_PORT}  x  `
+	])('rejects an out-of-range or malformed port %j', (bad) => {
+		expect(parseLabels({ ...enabled, 'homemedia.port': bad }).port).toBeNull();
+	});
 });
 
 describe('parseLabels — order (any integer; malformed → default, not error)', () => {
