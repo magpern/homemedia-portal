@@ -256,9 +256,12 @@ FR-030; SC-003, SC-009, SC-010, SC-015; `contracts/label-contract.md`;
   `homemedia.lan_only`, category casefold, order default 100, unknown keys
   ignored, malformed value → default not error).
 - [ ] T043 [US1] `src/lib/server/docker/projection.ts` — `RawContainer` +
-  `LabelSet` + `deriveStatus` → `ServiceProjection`; `href` order (`homemedia.url`
-  → `homemedia.port` + configured link base → `null`); slug; icon id resolved
-  against the bundled set else `generic` (depends on T019, T025, T042).
+  `LabelSet` + `deriveStatus` → `ServiceProjection`; `href` order per
+  [data-model.md](./data-model.md) §3: valid absolute `homemedia.url` (verbatim,
+  wins, and is the **only** way to get HTTPS) → else `homemedia.port` +
+  `SERVICE_LINK_BASE` → **`http://<SERVICE_LINK_BASE>:<port>` (plain `http` only,
+  TLS never inferred)** → else `null`; slug; icon id resolved against the bundled
+  set else `generic` (depends on T019, T025, T042).
 - [ ] T044 [US1] `src/lib/server/docker/dashboard.ts` — group into `Category[]`,
   compute `counts`, build `DashboardModel`; **two failure modes**: discovery ok +
   some inspects fail → `sourceOk:true`, all discovered services listed, affected
@@ -266,8 +269,10 @@ FR-030; SC-003, SC-009, SC-010, SC-015; `contracts/label-contract.md`;
   cached/retained (depends on T018, T043).
 - [ ] T045 [P] [US1] Unit tests `tests/unit/labels.spec.ts`,
   `tests/unit/projection.spec.ts`, `tests/unit/dashboard.spec.ts` — every label
-  default/normalisation; `href` order incl. `null`; both FR-030 modes; no
-  non-labelled container ever appears in the model.
+  default/normalisation; `href` order incl. `null`; **`homemedia.port` always
+  yields a plain `http://` link and never `https`; an HTTPS destination requires
+  `homemedia.url`; a valid `homemedia.url` wins over `homemedia.port`**; both
+  FR-030 modes; no non-labelled container ever appears in the model.
 - [ ] T046 [US1] WP5 closeout: disclosure scan + evidence; open PR.
 
 ### WP6 — Dashboard UI → PR "feat: dashboard, search, cards, states"
@@ -407,18 +412,25 @@ SC-007; research R9; Constitution XII.
 
 **Depends on**: WP12, WP11b. **Traces**: Constitution VI, VII; plan.md CI section.
 
-- [ ] T071 `.github/workflows/build.yml` — triggers: push to `main`, `v*` tags,
-  `workflow_dispatch`; `permissions: {contents: read, packages: write}`;
+- [ ] T071 `.github/workflows/build.yml` — triggers: push to `main`, push of a
+  `v*` tag, `workflow_dispatch`; `permissions: {contents: read, packages: write}`;
   `docker/login-action` with `github.actor` + `secrets.GITHUB_TOKEN` (no PAT);
-  build `linux/amd64`; tags `sha-<short>` always + `v<semver>` on tag pushes;
-  **never `latest`**; layer cache `type=gha`.
+  build `linux/amd64`; **`main` push → publish the immutable `sha-<short>` tag
+  only**; **`v<semver>` tag push → publish the matching `v<semver>` image (plus
+  `sha-<short>`)**; **never `latest`**; layer cache `type=gha`. **CI MUST NOT
+  create any git tag** — it only reacts to a tag the owner has pushed (product-owner
+  decision 2026-08-30).
 - [ ] T072 [P] CI job: run `npm run test:all` (unit + e2e via the local-HTTPS
-  harness) and the disclosure scan as a **required gate** before publish.
+  harness) and the disclosure scan as a **required gate** before any publish.
 - [ ] T073 One-time, documented (not automated in-repo): set the GHCR package
   visibility to **public** so the server pulls anonymously (no server-side
   registry credential).
-- [ ] T074 Confirm no CI secret is needed for the portal's own auth (password /
-  session secret are runtime-only); note this in the workflow file header.
+- [ ] T074 Workflow-header + `docs/deployment.md` notes: (a) no CI secret is
+  needed for the portal's own auth (password / session secret are runtime-only);
+  (b) the **release flow** — the owner manually creates a `v<semver>` git tag from
+  an accepted `main` commit **only after WP16a acceptance has passed** and pushes
+  it to trigger the semver image; CI never creates tags; deployed compose pins the
+  resulting `@sha256:` digest.
 - [ ] T075 WP13 closeout: disclosure scan + evidence (a green run + a published
   test digest); open PR.
 
@@ -596,27 +608,31 @@ WP16b (reverse-proxy)    [separately authorised, after WP16a]
 
 ---
 
-## Ambiguities to resolve at the relevant WP (reported, not decided here)
+## Product-Owner Decisions (recorded 2026-08-30)
 
-1. **`homemedia.port` link scheme** — [data-model.md](./data-model.md) §3 forms
-   `<scheme>://<base-host>:<port>` but does not fix the scheme. Decision needed
-   (per-service `http`/`https`, or a single default), recorded in
-   `PRIVATE-CONTEXT.md`, not the repo. Affects T043.
-2. **Semver tag origin** — T071 publishes `v<semver>` on tag pushes; who cuts the
-   tag and from what is unspecified. Affects T071.
-3. **Node base image minor + digest** — T067 must pin a digest; the exact Node 22
+Decided at the tasks-PR (#4) review; folded into `data-model.md`,
+`contracts/label-contract.md`, and the tasks above.
+
+| # | Decision | Applied in |
+|---|----------|-----------|
+| A | **`homemedia.port` link scheme.** `homemedia.url` (valid absolute `http`/`https`) is the complete explicit destination and always wins; it is the **only** way to reach an HTTPS service. Otherwise `homemedia.port` builds **`http://<SERVICE_LINK_BASE>:<port>` — plain `http` only, TLS is never guessed or inferred**. `SERVICE_LINK_BASE` stays in untracked private operator notes; no real host/port/hostname/inventory in tracked files. | data-model.md §3 + label table; label-contract.md `homemedia.url` / `homemedia.port`; T043, T045 |
+| B | **Release-tag authority.** Release tags are created **manually by the owner**, from an accepted `main` commit, **only after WP16a acceptance passes**. **CI never creates tags** — it publishes the `v<semver>` image only in response to the owner's pushed `v<semver>` tag. A normal `main` push publishes only the immutable `sha-<short>` tag. | T071, T074 |
+
+## Ambiguities still open (reported, not decided here)
+
+1. **Node base image minor + digest** — T067 must pin a digest; the exact Node 22
    minor and its digest are chosen at implementation time and recorded in the
    Dockerfile comment. Deliberate choice required, not a blocker.
-4. **Icon subset membership** — T025's *list* of icon ids is driven by the
+2. **Icon subset membership** — T025's *list* of icon ids is driven by the
    owner-selected service inventory in `PRIVATE-CONTEXT.md`; confirm that list is
    final before bundling. The list stays private.
-5. **US1 AC "within one screen of scrolling for a typical set"** — not precisely
-   measurable; treated as covered by SC-004 (find+open < 15 s). Flag if the
-   product owner wants a hard cap.
-6. **"About"/footer attribution placement** (T027) — exact UI location is a design
+3. **US1 AC "within one screen of scrolling for a typical set"** — not precisely
+   measurable; treated as covered by SC-004 (find+open < 15 s). No hard cap unless
+   the product owner asks.
+4. **"About"/footer attribution placement** (T027) — exact UI location is a design
    choice; any always-reachable location satisfies FR-012 / R7.
 
-Do not invent answers to 1–4; raise them in the relevant WP's PR if still open.
+Do not invent answers to 1–2; raise them in the relevant WP's PR if still open.
 
 ---
 
