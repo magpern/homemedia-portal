@@ -77,8 +77,9 @@ graph still governs sequencing.
 | 2 | Discovery foundation | WP4 + WP7 | bundle 1 |
 | 3 | Authentication | WP2 + WP3 | bundle 1 |
 | 4 | MVP dashboard | WP5 + WP6 | bundles 2 and 3 |
-| 5 | Product completion | WP8 + WP9 + WP10 | bundle 4 |
-| 6 | Delivery readiness | WP11b + WP12 + WP13 | bundle 4 |
+| 4a | LAN preview packaging | WP10 + WP11b + WP12 + WP13 | bundle 4 |
+| 5 | Product completion | WP8 + WP9 + ~~WP10~~ (moved to 4a) | bundle 4 |
+| 6 | Delivery readiness | ~~WP11b + WP12 + WP13~~ (delivered in 4a) | bundle 4 |
 | 7 | Operations | WP14 + WP15 | bundle 6 |
 | 8 | Final local acceptance | WP16a | every prior bundle |
 | 9 | External acceptance | WP16b | **separately authorised** (see below) |
@@ -88,8 +89,33 @@ outside this repository's and any infrastructure's scope**; unchanged from the
 WP16b section below. No other bundle may be combined with it.
 
 Within a bundle, the original inter-WP dependency order still governs the order
-tasks run (e.g. bundle 3: WP2's tasks precede WP3's; bundle 6: WP12 → WP11b →
-WP13).
+tasks run (e.g. bundle 3: WP2's tasks precede WP3's; bundle 4a: WP10 → WP11b →
+WP12 → WP13).
+
+#### Bundle 4a — LAN preview packaging (product-owner decision D)
+
+Bundle 4a exists so a **safe container image** is available for a later,
+separately-authorised **LAN-only preview** of the finished authenticated
+dashboard while WP8/WP9 and the delivery-readiness work continue. It is the
+approved Bundle 6 content plus **WP10 pulled forward from Bundle 5 for this
+bundle only**, because the WP12 container health check, the container restart
+policy, and the operator's liveness check all require `/healthz`.
+
+This is **packaging order only**:
+
+- No task ID, dependency edge, requirement, acceptance criterion, per-WP
+  closeout, or the Coverage Matrix changes. WP10 keeps its `[US5]` tag, its
+  `depends on WP1`, and its FR-025 / SC traces; WP11b/WP12/WP13 are unchanged.
+- WP8, WP9 stay in Bundle 5; WP14/WP15 (Bundle 7), WP16a, and WP16b are
+  unchanged and still follow in order. Bundle 5's "may start" gate is still
+  "bundle 4".
+- Bundle 4a **prepares** a future LAN-only preview. It does **not** authorise or
+  perform any deployment, external routing, reverse-proxy / DNS / router /
+  firewall / VPN / CDN change, `homemedia.*` label change, or server operation.
+  Actual preview deployment is a separate, explicitly-authorised step after this
+  PR is accepted.
+- No versioned release tag is created (product-owner decision B is unchanged): a
+  `main` push publishes only the immutable per-commit image.
 
 ### Rules for a combined PR
 
@@ -454,9 +480,14 @@ SC-007; research R9; Constitution XII.
 - [ ] T067 `Dockerfile` — multi-stage; base image **pinned by digest**
   (`FROM node@sha256:…` with a `# Node 22 LTS Alpine` comment), not a mutable tag;
   build stage `npm ci && npm run build` (WASM Argon2 needs no build toolchain);
-  runtime stage copies `build/` + prod deps, runs as non-root `node`, `EXPOSE` the
-  adapter port, `HEALTHCHECK` via BusyBox `wget` on `/healthz`,
-  `CMD ["node","build"]`. No credential build args.
+  runtime stage copies `build/` + prod deps, runs as non-root `node`,
+  `HEALTHCHECK` via BusyBox `wget` on `/healthz`, `CMD ["node","build"]`. No
+  credential build args.
+  **(Bundle 4a note)** The health check MUST target the **configured runtime
+  listener** (the port the server actually binds, read from its runtime
+  environment) and MUST NOT introduce a literal deployment port anywhere in a
+  tracked file. **No `EXPOSE`** — it is documentation-only and would commit a
+  concrete port; the private Compose deployment does not need it.
 - [ ] T068 [P] `.dockerignore` — exclude `.git`, `node_modules`, tests, `*.md`
   except what the image needs, `PRIVATE-CONTEXT.md`, `.env*`.
 - [ ] T069 Manual/E2E: build the image; `dive` / `docker history` shows no secret
@@ -668,19 +699,21 @@ WP16b (reverse-proxy)    [separately authorised, after WP16a]
 
 Decisions **A–B** were decided at the tasks-PR (#4) review and folded into
 `data-model.md`, `contracts/label-contract.md`, and the tasks above. Decision
-**C** was recorded after WP0 merged.
+**C** was recorded after WP0 merged. Decision **D** was recorded after Bundle 4
+merged.
 
 | # | Decision | Applied in |
 |---|----------|-----------|
 | A | **`homemedia.port` link scheme.** `homemedia.url` (valid absolute `http`/`https`) is the complete explicit destination and always wins; it is the **only** way to reach an HTTPS service. Otherwise `homemedia.port` builds **`http://<SERVICE_LINK_BASE>:<port>` — plain `http` only, TLS is never guessed or inferred**. `SERVICE_LINK_BASE` stays in untracked private operator notes; no real host/port/hostname/inventory in tracked files. | data-model.md §3 + label table; label-contract.md `homemedia.url` / `homemedia.port`; T043, T045 |
 | B | **Release-tag authority.** Release tags are created **manually by the owner**, from an accepted `main` commit, **only after WP16a acceptance passes**. **CI never creates tags** — it publishes the `v<semver>` image only in response to the owner's pushed `v<semver>` tag. A normal `main` push publishes only the immutable `sha-<short>` tag. | T071, T074 |
 | C | **Accelerated work-package cadence.** Compatible WPs may be delivered together as one implementation PR, strictly per the approved bundles in [Review cadence](#review-cadence-accelerated--product-owner-decision-2026-08-30), to reduce review overhead. **Retained unchanged:** every WP boundary, task ID, dependency and its ordering, the mandatory per-WP closeouts, all requirements / acceptance criteria / contracts, and the Coverage Matrix. **Not** an expansion of scope. A combined PR must carry every bundled WP's tasks + closeouts, be reviewed against every affected contract and Constitution principle, not begin a later bundle until all its dependencies are merged, and stay small enough to verify meaningfully — otherwise it splits back into the original per-WP PRs. WP16b stays separately authorised. | Review cadence section; Organization note; Notes |
+| D | **LAN preview packaging (Bundle 4a).** After Bundle 4, **WP10 + WP11b + WP12 + WP13** may be delivered as one PR ("Bundle 4a"), with **WP10 pulled forward from Bundle 5 for this bundle only** (the WP12 health check / restart policy / operator liveness check all need `/healthz`). Purpose: make a safe, digest-pinned container image available for a later, **separately-authorised, LAN-only preview** of the authenticated dashboard while WP8/WP9 continue. **Packaging order only** — no task ID, dependency, requirement, acceptance criterion, closeout, or Coverage-Matrix change; WP8/WP9 stay in Bundle 5; WP14/WP15/WP16a/WP16b unchanged. Bundle 4a **prepares** but does not authorise or perform any deployment, external route, reverse-proxy / DNS / router / firewall / VPN / CDN change, `homemedia.*` label change, or server operation. Decision B unchanged (no release tag; `main` push → immutable per-commit image only). The WP12 health check targets the configured runtime listener and adds no literal deployment port; no `EXPOSE`. | Review cadence "Bundle 4a" subsection; T060–T062, T063–T075 (unchanged); T067 Bundle 4a note |
 
 ## Ambiguities still open (reported, not decided here)
 
-1. **Node base image minor + digest** — T067 must pin a digest; the exact Node 22
-   minor and its digest are chosen at implementation time and recorded in the
-   Dockerfile comment. Deliberate choice required, not a blocker.
+1. **Node base image minor + digest** — resolved in Bundle 4a: T067 pins the
+   current Node 22 LTS Alpine image by its multi-arch index digest, recorded in
+   the `Dockerfile` comment. Bumped deliberately thereafter.
 2. **Icon subset membership** — T025's *list* of icon ids is driven by the
    owner-selected service inventory in `PRIVATE-CONTEXT.md`; confirm that list is
    final before bundling. The list stays private.

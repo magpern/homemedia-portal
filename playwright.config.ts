@@ -12,6 +12,12 @@ import { HTTPS_URL_ENV } from './tests/harness/constants.js';
  * (the `test:e2e` script) starts the harness and passes its chosen
  * `https://localhost` origin in `HMP_E2E_HTTPS_URL`. `tests/harness/README.md`
  * documents a locally trusted CA alternative.
+ *
+ * The suite runs **single-worker** (`workers: 1`): every spec shares one built
+ * server process, whose in-memory login throttle (WP2) and the run's stub
+ * Docker source (one scenario at a time) are process-global. Serialising the
+ * whole run makes each spec hermetic via its own `beforeEach` and removes the
+ * only source of cross-spec flakiness. The suite is small; the cost is seconds.
  */
 // Set by `tests/harness/run-e2e.mjs` (the `test:e2e` script). Running
 // `playwright test` directly without it leaves `baseURL` unset and the specs
@@ -20,7 +26,8 @@ const httpsOrigin = process.env[HTTPS_URL_ENV];
 
 export default defineConfig({
 	testDir: 'tests/e2e',
-	fullyParallel: true,
+	fullyParallel: false,
+	workers: 1,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 1 : 0,
 	reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
