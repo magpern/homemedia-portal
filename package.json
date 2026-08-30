@@ -20,6 +20,7 @@
 		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
+		"@axe-core/playwright": "4.13.0",
 		"@eslint/js": "10.0.1",
 		"@playwright/test": "1.62.1",
 		"@sveltejs/adapter-node": "5.5.7",
@@ -32,6 +33,7 @@
 		"globals": "17.11.0",
 		"prettier": "3.9.6",
 		"prettier-plugin-svelte": "4.1.1",
+		"selfsigned": "5.5.0",
 		"svelte": "5.57.0",
 		"svelte-check": "4.7.6",
 		"typescript": "6.0.3",
