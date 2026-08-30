@@ -15,12 +15,15 @@ cookie for tests is forbidden.
 `npm run test:e2e` builds the app, then runs `run-e2e.mjs`, which:
 
 1. calls `startHarness()` in `serve-https.mjs`:
-    - starts the **built** `@sveltejs/adapter-node` server with `PORT=0` (an
-      **OS-assigned ephemeral loopback port**), reading the port it actually
-      bound from its stdout banner;
-    - puts an HTTPS terminator in front of it on its own **ephemeral** port
-      (`listen(0)`), self-signed certificate generated in memory each run —
-      nothing is written to disk — injecting `X-Forwarded-Proto: https`;
+    - starts the **built** `@sveltejs/adapter-node` server with `HOST=localhost`
+      and `PORT=0` (an **OS-assigned ephemeral port, localhost-bound**), reading
+      the address it actually bound from its stdout banner;
+    - puts an HTTPS terminator in front of it, also `localhost`-bound on its own
+      ephemeral port (`listen(0, 'localhost')`), self-signed certificate
+      generated in memory each run — nothing is written to disk — injecting
+      `X-Forwarded-Proto: https`;
+    - `assertLoopback()` re-checks each listener's bound address is a real OS
+      loopback address (no external connectivity test);
     - serves a few harness-only fixture routes under `/__https-harness__/` (a
       readiness ping, and a `Secure`-cookie set/echo pair used by the WP11a
       smoke test). These exist only in the terminator — the application gains no
@@ -30,8 +33,8 @@ cookie for tests is forbidden.
    (`playwright.config.ts` reads it into `use.baseURL`);
 3. tears the harness down on every exit path.
 
-**No port number, hostname, IP, or deployment path is written in any tracked
-file** — every port is chosen by the OS at run time.
+**No IP address or concrete port number is written in any tracked file** — the
+only host is `localhost` and every port is chosen by the OS at run time.
 
 `playwright.config.ts` defines two projects: a 360 × 780 mobile viewport and the
 same with `reducedMotion: 'reduce'`, both with `ignoreHTTPSErrors: true` (the

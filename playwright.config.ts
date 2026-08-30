@@ -7,10 +7,11 @@ import { HTTPS_URL_ENV } from './tests/harness/constants.js';
  * exercised. `ignoreHTTPSErrors` covers the harness's self-signed certificate;
  * the origin is still `https://`, i.e. a secure context.
  *
- * The harness binds OS-assigned **ephemeral** loopback ports, so there is no
- * `webServer` block here — `tests/harness/run-e2e.mjs` (the `test:e2e` script)
- * starts the harness and passes its chosen origin in `HMP_E2E_HTTPS_URL`.
- * `tests/harness/README.md` documents a locally trusted CA alternative.
+ * Both harness listeners are `localhost`-bound on OS-assigned **ephemeral**
+ * ports, so there is no `webServer` block here — `tests/harness/run-e2e.mjs`
+ * (the `test:e2e` script) starts the harness and passes its chosen
+ * `https://localhost` origin in `HMP_E2E_HTTPS_URL`. `tests/harness/README.md`
+ * documents a locally trusted CA alternative.
  */
 // Set by `tests/harness/run-e2e.mjs` (the `test:e2e` script). Running
 // `playwright test` directly without it leaves `baseURL` unset and the specs

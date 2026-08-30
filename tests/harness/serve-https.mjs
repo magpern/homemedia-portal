@@ -10,66 +10,43 @@
  * container image, never part of a deployment or CI publish. The certificate is
  * generated in memory on every run and never written to disk.
  *
- * Ports are **OS-assigned ephemeral loopback ports**: the terminator listens on
- * `:0`, the adapter runs with `PORT=0`. No port number is written anywhere. The
- * chosen `https://` origin is returned from {@link startHarness} (and printed
- * when this file is run directly).
+ * Both listeners are **`localhost`-bound** (never exposed beyond loopback) on
+ * **OS-assigned ephemeral ports**: the terminator does `listen(0, 'localhost')`,
+ * the adapter runs with `HOST=localhost` and `PORT=0`. No IP address or concrete
+ * port number is written anywhere. {@link assertLoopback} re-checks each
+ * listener's bound address at run time.
  */
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 import selfsigned from 'selfsigned';
 import {
 	HARNESS_ECHO_PATH,
+	HARNESS_HOST,
 	HARNESS_PING_PATH,
 	HARNESS_PREFIX,
 	HARNESS_PROBE_COOKIE,
 	HARNESS_SET_COOKIE_PATH
 } from './constants.js';
+import { assertLoopback, buildChildEnv } from './lib.js';
 
-/** A shape-valid Argon2id PHC string for a throwaway test password (not a secret). */
-function synthPhc() {
-	return [
-		'',
-		'argon2id',
-		'v=19',
-		'm=19456,t=2,p=1',
-		randomBytes(16).toString('base64'),
-		randomBytes(32).toString('base64')
-	].join('$');
-}
-
-/** Synthetic, safe env for the adapter child when the caller supplies none. */
-function childEnv(origin, adapterPortValue) {
-	return {
-		...process.env,
-		PORT: adapterPortValue,
-		ORIGIN: origin,
-		PORTAL_USERNAME: process.env.PORTAL_USERNAME ?? 'e2e-user',
-		SESSION_SECRET: process.env.SESSION_SECRET ?? randomBytes(48).toString('base64'),
-		PORTAL_PASSWORD_ARGON2: process.env.PORTAL_PASSWORD_ARGON2 ?? synthPhc(),
-		DOCKER_PROXY_URL: process.env.DOCKER_PROXY_URL ?? 'http://socket-proxy.invalid/'
-	};
-}
-
-/** Read the actual (ephemeral) port the adapter bound, from its stdout banner. */
-function readAdapterPort(child, timeoutMs = 60_000) {
+/** Read the adapter's actual bound host + ephemeral port from its stdout banner. */
+function readAdapterAddress(child, timeoutMs = 60_000) {
 	return new Promise((resolve, reject) => {
 		let buffer = '';
 		const timer = setTimeout(
-			() => reject(new Error('adapter did not report a listening port')),
+			() => reject(new Error('adapter did not report a listening address')),
 			timeoutMs
 		);
 		child.stdout.setEncoding('utf8');
 		child.stdout.on('data', (chunk) => {
 			process.stderr.write(chunk);
 			buffer += chunk;
-			const match = buffer.match(/Listening on https?:\/\/[^\s:]+:(\d+)/);
+			const match = buffer.match(/Listening on https?:\/\/(\[[^\]]+]|[^\s:]+):(\d+)/);
 			if (match) {
 				clearTimeout(timer);
-				resolve(Number(match[1]));
+				resolve({ host: match[1], port: Number(match[2]) });
 			}
 		});
 		child.once('exit', (code) => {
@@ -89,7 +66,7 @@ function makeRequestHandler(getOrigin, getAdapterPort) {
 		};
 		const upstream = http.request(
 			{
-				host: 'localhost',
+				host: HARNESS_HOST,
 				port: getAdapterPort(),
 				method: req.method,
 				path: req.url,
@@ -137,20 +114,20 @@ function makeRequestHandler(getOrigin, getAdapterPort) {
 }
 
 /**
- * Build the app, then start the TLS terminator + adapter on ephemeral ports.
+ * Start the TLS terminator + adapter, both `localhost`-bound on ephemeral ports.
  * @returns {Promise<{ httpsUrl: string, stop: () => Promise<void> }>}
  */
 export async function startHarness() {
 	const notAfterDate = new Date();
 	notAfterDate.setDate(notAfterDate.getDate() + 2);
 	// selfsigned v5 is async-only and returns PEM strings.
-	const pems = await selfsigned.generate([{ name: 'commonName', value: 'localhost' }], {
+	const pems = await selfsigned.generate([{ name: 'commonName', value: HARNESS_HOST }], {
 		keySize: 2048,
 		algorithm: 'sha256',
 		notAfterDate,
 		extensions: [
 			{ name: 'basicConstraints', cA: false },
-			{ name: 'subjectAltName', altNames: [{ type: 2, value: 'localhost' }] }
+			{ name: 'subjectAltName', altNames: [{ type: 2, value: HARNESS_HOST }] }
 		]
 	});
 
@@ -164,24 +141,28 @@ export async function startHarness() {
 		)
 	);
 
-	// Bind every loopback address family so the port is reachable whichever one
-	// `localhost` resolves to for the test runner.
-	await new Promise((resolve) => server.listen(0, resolve));
-	httpsUrl = `https://localhost:${server.address().port}`;
+	await new Promise((resolve) => {
+		server.listen(0, HARNESS_HOST, () => resolve(undefined));
+	});
+	const bound = /** @type {import('node:net').AddressInfo} */ (server.address());
+	assertLoopback(bound.address, 'TLS terminator');
+	httpsUrl = `https://${HARNESS_HOST}:${bound.port}`;
 
 	const child = spawn(process.execPath, ['build'], {
-		env: childEnv(httpsUrl, '0'),
+		env: buildChildEnv(httpsUrl),
 		stdio: ['ignore', 'pipe', 'inherit']
 	});
-	adapterPort = await readAdapterPort(child).catch(async (err) => {
+	const adapter = await readAdapterAddress(child).catch(async (err) => {
 		child.kill('SIGKILL');
-		await new Promise((r) => server.close(r));
+		await new Promise((resolve) => server.close(() => resolve(undefined)));
 		throw err;
 	});
+	assertLoopback(adapter.host, 'adapter server');
+	adapterPort = adapter.port;
 
 	async function stop() {
 		child.kill('SIGTERM');
-		await new Promise((resolve) => server.close(() => resolve()));
+		await new Promise((resolve) => server.close(() => resolve(undefined)));
 	}
 
 	return { httpsUrl, stop };

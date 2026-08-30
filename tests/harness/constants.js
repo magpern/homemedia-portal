@@ -1,15 +1,18 @@
 /**
  * Shared constants for the local-HTTPS end-to-end harness (research R11).
  *
- * Test-only. **No port numbers, hostnames, IPs, or paths that mean anything to a
- * deployment appear here or anywhere else in the tree** — the harness binds
- * OS-assigned **ephemeral** loopback ports at run time (`listen(0)` / `PORT=0`)
- * and passes the resulting `https://` origin to Playwright through
+ * Test-only. **No IP addresses or concrete port numbers appear here or anywhere
+ * else in the tree** — both listeners are `localhost`-bound on OS-assigned
+ * **ephemeral** ports chosen at run time (`listen(0, 'localhost')` / `HOST=localhost`
+ * `PORT=0`), and the resulting `https://` origin is passed to Playwright through
  * `HMP_E2E_HTTPS_URL`.
  *
  * Imported by `serve-https.mjs`, `run-e2e.mjs`, `playwright.config.ts`, and the
  * e2e specs.
  */
+
+/** The only host the harness ever binds or connects to. */
+export const HARNESS_HOST = 'localhost';
 
 /** Env var carrying the harness's chosen `https://localhost:<ephemeral>` origin. */
 export const HTTPS_URL_ENV = 'HMP_E2E_HTTPS_URL';
