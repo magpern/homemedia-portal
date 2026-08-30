@@ -16,6 +16,12 @@ playwright-report
 # Static assets served verbatim
 /static/
 
+# Vendored icon assets — kept byte-for-byte as pinned upstream
+# (see src/lib/icons/PROVENANCE.md). LICENSE/NOTICE are redistributed verbatim.
+/src/lib/icons/svg/
+/src/lib/icons/LICENSE
+/src/lib/icons/NOTICE
+
 # Spec Kit tooling and specification documents — owned by the Spec Kit
 # workflow / earlier PRs, not formatted by this project's Prettier config.
 /.specify/
