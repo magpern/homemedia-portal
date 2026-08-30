@@ -1,14 +1,5 @@
 name: build
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PENDING PLACEMENT — this file must be moved to `.github/workflows/build.yml`
-# to take effect. It is delivered here because the automation account's token
-# lacks the `workflow` scope and cannot push under `.github/workflows/`. The
-# owner (or any push from a `workflow`-scoped token / the GitHub web editor)
-# should `git mv .github/workflows-pending/build.yml .github/workflows/build.yml`.
-# Reviewed as-is; no content change is needed on move.
-# ─────────────────────────────────────────────────────────────────────────────
-
 # Validation gates on every pull request; the same gates plus a publish on an
 # accepted push to `main` and on an owner-pushed `v<semver>` tag.
 #

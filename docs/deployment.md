@@ -27,11 +27,9 @@ Built from the repository [`Dockerfile`](../Dockerfile):
 ## CI workflow
 
 The build / validate / publish workflow is
-[`.github/workflows-pending/build.yml`](../.github/workflows-pending/build.yml).
-It must be moved to `.github/workflows/build.yml` to take effect —
-`git mv .github/workflows-pending/build.yml .github/workflows/build.yml` from a
-push that carries the `workflow` token scope, or via the GitHub web editor. No
-content change is needed on the move.
+[`.github/workflows/build.yml`](../.github/workflows/build.yml). It runs the
+validation gates on every pull request, and on an accepted push to `main` or an
+owner-pushed `v<semver>` tag it runs the same gates followed by the publish job.
 
 ## Registry and tags
 
