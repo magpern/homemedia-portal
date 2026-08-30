@@ -232,7 +232,8 @@ docs (`createHmac`, `timingSafeEqual`); `hash-wasm` project README.
   remains. Constitution IV forbids it.
 - `linuxserver/docker-socket-proxy`: equivalent; Tecnativa chosen as the
   widely-audited reference implementation.
-- Portainer's API: rejected — heavier, and grants far more than list/inspect.
+- A full container-management UI's own API: rejected — heavier, and grants far
+  more than list/inspect.
 
 Source: Tecnativa `docker-socket-proxy` README (environment variables, "read-only"
 behaviour, its TCP listen port); Docker Engine API reference (`/containers/json`,

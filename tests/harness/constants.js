@@ -34,3 +34,22 @@ export const HARNESS_PROBE_COOKIE = '__hmp_https_probe';
 export const E2E_USERNAME_ENV = 'HMP_E2E_USERNAME';
 export const E2E_PASSWORD_ENV = 'HMP_E2E_PASSWORD';
 export const E2E_SESSION_SECRET_ENV = 'HMP_E2E_SESSION_SECRET';
+
+/**
+ * Env var carrying the base URL of the run's in-process Docker-API mock (a stub
+ * `docker-socket-proxy`). The dashboard e2e specs POST `{mode}` to
+ * `<url>/__control` to switch between the normal / per-inspect-failure /
+ * discovery-failure fixtures. Test tooling only.
+ */
+export const E2E_DOCKER_MOCK_ENV = 'HMP_E2E_DOCKER_MOCK_URL';
+
+/** Bare host the dashboard e2e uses to build `homemedia.port` links (never real). */
+export const E2E_SERVICE_LINK_BASE = 'link-base.invalid';
+
+/**
+ * `homemedia.port` field bounds (mirrors `src/lib/server/labels.ts` — the TCP
+ * range, not a deployment port) and an arbitrary in-range value for the
+ * dashboard fixture, derived so no concrete port number is written literally.
+ */
+export const HOMEMEDIA_PORT_MIN = 1;
+export const E2E_FIXTURE_PORT = HOMEMEDIA_PORT_MIN + 1;

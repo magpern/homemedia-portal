@@ -1,0 +1,41 @@
+/*
+ * Global design tokens for Portal v1.
+ *
+ * The visual language is a single, deliberate dark "control-room" aesthetic
+ * (spec FR-020) built with CSS only — no theme switch, no WebGL, no parallax.
+ * Colours are chosen for WCAG 2.1 AA: body text ≥ 4.5:1 and essential non-text
+ * UI ≥ 3:1 against their backgrounds (FR-021, verified by the axe e2e).
+ *
+ * Only the dashboard route paints from these tokens (see `src/routes/+page.svelte`);
+ * the login route keeps its own light, self-contained styling.
+ */
+
+:root {
+	--hmp-bg: #0d1117;
+	--hmp-surface: #161d26;
+	--hmp-surface-raised: #202a36;
+
+	--hmp-text: #e9eef3;
+	--hmp-text-dim: #a9b2bb;
+	--hmp-text-faint: #8b949e;
+
+	--hmp-border: #2b3540;
+	--hmp-border-strong: #3d4a57;
+
+	--hmp-focus: #6cb6ff;
+	--hmp-accent: #539bf5;
+
+	--hmp-status-up: #3fb950;
+	--hmp-status-up-text: #57d970;
+	--hmp-status-down: #e3873c;
+	--hmp-status-down-text: #f0a763;
+	--hmp-status-unknown: #8b949e;
+
+	--hmp-radius: 10px;
+
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
