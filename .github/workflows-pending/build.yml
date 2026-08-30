@@ -1,0 +1,108 @@
+name: build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PENDING PLACEMENT — this file must be moved to `.github/workflows/build.yml`
+# to take effect. It is delivered here because the automation account's token
+# lacks the `workflow` scope and cannot push under `.github/workflows/`. The
+# owner (or any push from a `workflow`-scoped token / the GitHub web editor)
+# should `git mv .github/workflows-pending/build.yml .github/workflows/build.yml`.
+# Reviewed as-is; no content change is needed on move.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Validation gates on every pull request; the same gates plus a publish on an
+# accepted push to `main` and on an owner-pushed `v<semver>` tag.
+#
+# Publishing is limited to an immutable per-commit tag on `main` (`sha-<short>`)
+# and the matching image for a `v<semver>` tag. Never `latest`, never a mutable
+# branch tag. CI never creates a git tag — it only reacts to one the owner
+# pushes (product-owner decision B). Auth uses only the built-in GITHUB_TOKEN.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run check
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E (local-HTTPS harness + a11y/mobile)
+        run: npm run test:e2e
+
+      - name: Disclosure / secrets scan
+        run: bash scripts/disclosure-scan.sh
+
+      - name: Production image builds
+        run: docker build -t homemedia-portal:ci .
+
+  publish:
+    needs: validate
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # Immutable per-commit tag on main; matching v<semver> on a release tag.
+          # Never `latest`, never a mutable branch tag.
+          tags: |
+            type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          flavor: |
+            latest=false
+
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
