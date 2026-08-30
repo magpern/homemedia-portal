@@ -18,8 +18,11 @@ import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { startHarness } from './serve-https.mjs';
+import { startDockerMock } from './docker-mock.mjs';
 import {
+	E2E_DOCKER_MOCK_ENV,
 	E2E_PASSWORD_ENV,
+	E2E_SERVICE_LINK_BASE,
 	E2E_SESSION_SECRET_ENV,
 	E2E_USERNAME_ENV,
 	HTTPS_URL_ENV
@@ -41,6 +44,11 @@ process.env.PORTAL_USERNAME = e2eUsername;
 process.env.SESSION_SECRET = e2eSessionSecret;
 process.env.PORTAL_PASSWORD_ARGON2 = await realArgon2idPhc(e2ePassword);
 
+// Stub Docker source for the dashboard specs, wired in before the app starts.
+const dockerMock = await startDockerMock();
+process.env.DOCKER_PROXY_URL = dockerMock.url;
+process.env.SERVICE_LINK_BASE = E2E_SERVICE_LINK_BASE;
+
 const harness = await startHarness();
 
 let stopping = false;
@@ -48,6 +56,7 @@ async function stopHarness() {
 	if (stopping) return;
 	stopping = true;
 	await harness.stop().catch(() => {});
+	await dockerMock.stop().catch(() => {});
 }
 
 const playwright = spawn(process.execPath, [playwrightCli, 'test', ...process.argv.slice(2)], {
@@ -57,7 +66,8 @@ const playwright = spawn(process.execPath, [playwrightCli, 'test', ...process.ar
 		[HTTPS_URL_ENV]: harness.httpsUrl,
 		[E2E_USERNAME_ENV]: e2eUsername,
 		[E2E_PASSWORD_ENV]: e2ePassword,
-		[E2E_SESSION_SECRET_ENV]: e2eSessionSecret
+		[E2E_SESSION_SECRET_ENV]: e2eSessionSecret,
+		[E2E_DOCKER_MOCK_ENV]: dockerMock.url
 	}
 });
 
