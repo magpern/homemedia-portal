@@ -55,35 +55,37 @@
 		</div>
 	</header>
 
-	{#if !model.sourceOk}
-		<EmptyState variant="source-unavailable" />
-	{:else}
-		<SearchBar bind:value={query} />
+	<main class="dashboard-main">
+		{#if !model.sourceOk}
+			<EmptyState variant="source-unavailable" />
+		{:else}
+			<SearchBar bind:value={query} />
 
-		<p class="summary" role="status">
-			{#if model.counts.services === 0}
-				No services configured
-			{:else if term !== ''}
-				{visibleCount} of {model.counts.services} services match
-			{:else}
-				{model.counts.services} services · {model.counts.up} running · {model.counts.down} not
-				running{#if model.counts.unknown > 0}
-					· {model.counts.unknown} unavailable{/if}
-			{/if}
-		</p>
+			<p class="summary" role="status">
+				{#if model.counts.services === 0}
+					No services configured
+				{:else if term !== ''}
+					{visibleCount} of {model.counts.services} services match
+				{:else}
+					{model.counts.services} services · {model.counts.up} running · {model.counts
+						.down} not running{#if model.counts.unknown > 0}
+						· {model.counts.unknown} unavailable{/if}
+				{/if}
+			</p>
 
-		<div class="results">
-			{#if model.counts.services === 0}
-				<EmptyState variant="no-services" />
-			{:else if visibleCount === 0}
-				<EmptyState variant="no-results" query={query.trim()} />
-			{:else}
-				{#each filteredCategories as category (category.key)}
-					<CategorySection {category} />
-				{/each}
-			{/if}
-		</div>
-	{/if}
+			<div class="results">
+				{#if model.counts.services === 0}
+					<EmptyState variant="no-services" />
+				{:else if visibleCount === 0}
+					<EmptyState variant="no-results" query={query.trim()} />
+				{:else}
+					{#each filteredCategories as category (category.key)}
+						<CategorySection {category} />
+					{/each}
+				{/if}
+			</div>
+		{/if}
+	</main>
 
 	<SiteFooter />
 </div>

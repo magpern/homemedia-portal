@@ -7,17 +7,16 @@ import { expect, test } from './fixtures.js';
  * WP5 + WP6 dashboard e2e over the local-HTTPS harness with the stub Docker
  * source (`tests/harness/docker-mock.mjs`).
  *
- * The whole file runs **serially in one worker**: every spec here drives the one
- * process-global mock scenario, so they must not interleave with each other (and
- * no other spec file touches the mock). `mobile`-project only — the behaviour is
- * viewport-agnostic apart from the explicit 360px / reduced-motion assertions.
+ * The whole run is single-worker (`playwright.config.ts`); each spec resets the
+ * stub Docker scenario in `beforeEach`, so specs are hermetic. `mobile`-project
+ * only — dashboard behaviour is viewport-agnostic (WP11b's `a11y.spec.ts` /
+ * `mobile.spec.ts` carry the viewport + motion checks).
  *
  * Environment note: this sandbox's headless Chromium renders text with zero
  * measured height, so `toBeVisible()` on a text-only node always fails here.
  * These specs assert content with `toContainText` / `toHaveText` / `toHaveCount`
  * (which do not depend on layout) and reserve `toBeVisible()` / `boundingBox()`
- * for elements that carry their own box. The accessibility tree — exercised by
- * the axe assertion — confirms real visibility.
+ * for elements that carry their own box.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -178,65 +177,5 @@ test.describe('discovery isolation + FR-030 failure modes (WP5)', () => {
 	});
 });
 
-test.describe('mobile + accessibility (WP6)', () => {
-	test('every interactive control meets the 44px target size at 360px', async ({ page }) => {
-		await page.goto('/');
-		for (const selector of ['#service-search', '.btn', 'a.card', '.card--static']) {
-			const locator = page.locator(selector);
-			const count = await locator.count();
-			expect(count, selector).toBeGreaterThan(0);
-			for (let i = 0; i < count; i++) {
-				const box = await locator.nth(i).boundingBox();
-				expect(box, `${selector}#${i} has a box`).not.toBeNull();
-				expect(box!.height).toBeGreaterThanOrEqual(43.5);
-				expect(box!.width).toBeGreaterThanOrEqual(43.5);
-			}
-		}
-	});
-
-	test('no horizontal scroll at 360px', async ({ page }) => {
-		await page.goto('/');
-		const overflow = await page.evaluate(
-			() => document.documentElement.scrollWidth - document.documentElement.clientWidth
-		);
-		expect(overflow).toBeLessThanOrEqual(1);
-	});
-
-	test('service cards are keyboard focusable', async ({ page }) => {
-		await page.goto('/');
-		const focused = await page.evaluate(() => {
-			const card = document.querySelector('a.card');
-			if (!(card instanceof HTMLElement)) return false;
-			card.focus();
-			return document.activeElement === card;
-		});
-		expect(focused).toBe(true);
-	});
-
-	test('no serious or critical axe violations on the dashboard', async ({
-		page,
-		makeAxeBuilder
-	}) => {
-		await page.goto('/');
-		await expect(page.locator('section.category').first()).toBeVisible();
-		const results = await makeAxeBuilder().analyze();
-		const seriousOrCritical = results.violations.filter(
-			(v) => v.impact === 'serious' || v.impact === 'critical'
-		);
-		expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
-	});
-
-	test('no non-essential transition runs when reduced motion is requested', async ({ page }) => {
-		await page.emulateMedia({ reducedMotion: 'reduce' });
-		await page.goto('/');
-		const durations = await page.evaluate(() =>
-			[...document.querySelectorAll('a.card, .btn')].map(
-				(el) => getComputedStyle(el).transitionDuration
-			)
-		);
-		expect(durations.length).toBeGreaterThan(0);
-		for (const duration of durations) {
-			expect(duration === '0s' || duration === '').toBe(true);
-		}
-	});
-});
+// Accessibility, target-size, no-horizontal-scroll, keyboard, and reduced-motion
+// coverage for `/` and `/login` lives in `a11y.spec.ts` and `mobile.spec.ts` (WP11b).
