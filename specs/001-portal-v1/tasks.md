@@ -12,12 +12,17 @@ description: "Dependency-ordered implementation breakdown for Portal v1"
 **Tests**: **Required.** Constitution XII mandates tests / verification evidence
 for every change. Test tasks are first-class here, not optional.
 
-**Organization**: grouped into **Work Packages (WP)**. **Each WP is one narrow,
-independently reviewable pull request.** There is deliberately *no* single "big
-implementation" PR. Task IDs (`T001…`) are stable and sequential **in execution
-order** (every "depends on" points to a lower-numbered task); `[P]` =
-parallelisable (different files, deps satisfied); `[US#]` maps a task to a spec
-user story (used only inside user-story phases).
+**Organization**: grouped into **Work Packages (WP)**. WP boundaries, task IDs,
+dependencies, per-WP closeouts, and the Coverage Matrix are the unit of
+traceability and do **not** change. **Delivery** follows the accelerated review
+cadence below (product-owner decision 2026-08-30): a WP is still the smallest
+reviewable unit, but several compatible WPs may be delivered together in one
+implementation PR, strictly per the approved bundles — see
+[Review cadence](#review-cadence-accelerated--product-owner-decision-2026-08-30).
+Task IDs (`T001…`) are stable and sequential **in execution order** (every "depends
+on" points to a lower-numbered task); `[P]` = parallelisable (different files, deps
+satisfied); `[US#]` maps a task to a spec user story (used only inside user-story
+phases).
 
 ## Hard guardrails (apply to every task — non-negotiable)
 
@@ -51,6 +56,57 @@ For **every** WP, before opening its PR:
   NOT be merged (Constitution XII).
 - **Constitution check note** — map the change to the principles it touches; any
   deviation stops for product-owner decision.
+
+---
+
+## Review cadence (accelerated — product-owner decision 2026-08-30)
+
+WP0 shipped as its own PR. From WP1 onward, delivery uses **approved multi-WP
+bundles**: several compatible WPs are implemented and reviewed together in one
+pull request, to reduce review overhead. This changes **packaging only** — every
+task, every per-WP closeout, every dependency, every requirement / acceptance
+criterion, and the Coverage Matrix stay exactly as written. Scope is not
+expanded, and the [Dependencies & Execution Order](#dependencies--execution-order)
+graph still governs sequencing.
+
+### Approved bundles
+
+| # | Bundle | Work packages | May start once merged |
+|---|--------|---------------|-----------------------|
+| 1 | Foundation | WP1 + WP11a | WP0 |
+| 2 | Discovery foundation | WP4 + WP7 | bundle 1 |
+| 3 | Authentication | WP2 + WP3 | bundle 1 |
+| 4 | MVP dashboard | WP5 + WP6 | bundles 2 and 3 |
+| 5 | Product completion | WP8 + WP9 + WP10 | bundle 4 |
+| 6 | Delivery readiness | WP11b + WP12 + WP13 | bundle 4 |
+| 7 | Operations | WP14 + WP15 | bundle 6 |
+| 8 | Final local acceptance | WP16a | every prior bundle |
+| 9 | External acceptance | WP16b | **separately authorised** (see below) |
+
+Bundle 9 — **WP16b remains separately authorised, post-implementation, and
+outside this repository's and any infrastructure's scope**; unchanged from the
+WP16b section below. No other bundle may be combined with it.
+
+Within a bundle, the original inter-WP dependency order still governs the order
+tasks run (e.g. bundle 3: WP2's tasks precede WP3's; bundle 6: WP12 → WP11b →
+WP13).
+
+### Rules for a combined PR
+
+A PR that bundles WPs MUST:
+
+- include **every task and every closeout** (disclosure scan + evidence +
+  Constitution-check note) from **all** bundled WPs;
+- be reviewed against **every** contract and Constitution principle each bundled
+  WP touches — the union of their **Traces** lines;
+- **not** start a later bundle before **all** of that bundle's dependencies are
+  merged;
+- stay **small enough to verify meaningfully**. If it grows beyond that, split it
+  back into its original per-WP PRs — the WP boundaries are always a valid
+  fallback.
+
+Each WP's `→ PR "<title>"` line now names that WP's commit group and closeout
+**within its bundle's PR**, not a standalone PR (WP16b excepted).
 
 ---
 
@@ -610,13 +666,15 @@ WP16b (reverse-proxy)    [separately authorised, after WP16a]
 
 ## Product-Owner Decisions (recorded 2026-08-30)
 
-Decided at the tasks-PR (#4) review; folded into `data-model.md`,
-`contracts/label-contract.md`, and the tasks above.
+Decisions **A–B** were decided at the tasks-PR (#4) review and folded into
+`data-model.md`, `contracts/label-contract.md`, and the tasks above. Decision
+**C** was recorded after WP0 merged.
 
 | # | Decision | Applied in |
 |---|----------|-----------|
 | A | **`homemedia.port` link scheme.** `homemedia.url` (valid absolute `http`/`https`) is the complete explicit destination and always wins; it is the **only** way to reach an HTTPS service. Otherwise `homemedia.port` builds **`http://<SERVICE_LINK_BASE>:<port>` — plain `http` only, TLS is never guessed or inferred**. `SERVICE_LINK_BASE` stays in untracked private operator notes; no real host/port/hostname/inventory in tracked files. | data-model.md §3 + label table; label-contract.md `homemedia.url` / `homemedia.port`; T043, T045 |
 | B | **Release-tag authority.** Release tags are created **manually by the owner**, from an accepted `main` commit, **only after WP16a acceptance passes**. **CI never creates tags** — it publishes the `v<semver>` image only in response to the owner's pushed `v<semver>` tag. A normal `main` push publishes only the immutable `sha-<short>` tag. | T071, T074 |
+| C | **Accelerated work-package cadence.** Compatible WPs may be delivered together as one implementation PR, strictly per the approved bundles in [Review cadence](#review-cadence-accelerated--product-owner-decision-2026-08-30), to reduce review overhead. **Retained unchanged:** every WP boundary, task ID, dependency and its ordering, the mandatory per-WP closeouts, all requirements / acceptance criteria / contracts, and the Coverage Matrix. **Not** an expansion of scope. A combined PR must carry every bundled WP's tasks + closeouts, be reviewed against every affected contract and Constitution principle, not begin a later bundle until all its dependencies are merged, and stay small enough to verify meaningfully — otherwise it splits back into the original per-WP PRs. WP16b stays separately authorised. | Review cadence section; Organization note; Notes |
 
 ## Ambiguities still open (reported, not decided here)
 
@@ -639,7 +697,10 @@ Do not invent answers to 1–2; raise them in the relevant WP's PR if still open
 ## Notes
 
 - `[P]` = different files, dependencies satisfied.
-- Every WP = one PR; commit after each task or logical group; each PR carries its
-  disclosure-scan output and verification evidence.
+- Delivery follows the accelerated bundles in
+  [Review cadence](#review-cadence-accelerated--product-owner-decision-2026-08-30);
+  a combined PR carries every bundled WP's tasks and closeouts. Commit after each
+  task or logical group; each PR carries its disclosure-scan output and
+  verification evidence.
 - Verify tests fail before implementing the behaviour they cover, where practical.
 - No GitHub Issues are created from this file yet — that is a later, separate step.
