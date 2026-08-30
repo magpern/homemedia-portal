@@ -1,0 +1,3 @@
+# The portal is a private internal directory — no crawling anywhere.
+User-agent: *
+Disallow: /

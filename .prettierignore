@@ -1,0 +1,23 @@
+# Package managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Build / dependency output
+.svelte-kit
+build
+node_modules
+coverage
+test-results
+playwright-report
+
+# Static assets served verbatim
+/static/
+
+# Spec Kit tooling and specification documents — owned by the Spec Kit
+# workflow / earlier PRs, not formatted by this project's Prettier config.
+/.specify/
+/.claude/
+/specs/
