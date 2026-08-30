@@ -17,7 +17,7 @@
 		"format": "prettier --write .",
 		"test": "vitest run",
 		"test:unit": "vitest",
-		"test:e2e": "playwright test"
+		"test:e2e": "npm run build && node tests/harness/run-e2e.mjs"
 	},
 	"devDependencies": {
 		"@axe-core/playwright": "4.13.0",

@@ -12,24 +12,31 @@ cookie for tests is forbidden.
 
 ## What runs
 
-`serve-https.mjs`:
+`npm run test:e2e` builds the app, then runs `run-e2e.mjs`, which:
 
-1. starts the **built** `@sveltejs/adapter-node` server (`node build`) on a
-   loopback HTTP port, with synthetic test env values if none are supplied;
-2. puts an HTTPS terminator in front of it (self-signed certificate generated in
-   memory each run — nothing is written to disk), injecting
-   `X-Forwarded-Proto: https`;
-3. serves a few harness-only fixture routes under `/__https-harness__/` (a
-   readiness ping, and a `Secure`-cookie set/echo pair used by the WP11a smoke
-   test). These exist only in the terminator — the application gains no routes.
+1. calls `startHarness()` in `serve-https.mjs`:
+    - starts the **built** `@sveltejs/adapter-node` server with `PORT=0` (an
+      **OS-assigned ephemeral loopback port**), reading the port it actually
+      bound from its stdout banner;
+    - puts an HTTPS terminator in front of it on its own **ephemeral** port
+      (`listen(0)`), self-signed certificate generated in memory each run —
+      nothing is written to disk — injecting `X-Forwarded-Proto: https`;
+    - serves a few harness-only fixture routes under `/__https-harness__/` (a
+      readiness ping, and a `Secure`-cookie set/echo pair used by the WP11a
+      smoke test). These exist only in the terminator — the application gains no
+      routes;
+2. runs `playwright test`, passing the terminator's chosen
+   `https://localhost:<ephemeral>` origin in `HMP_E2E_HTTPS_URL`
+   (`playwright.config.ts` reads it into `use.baseURL`);
+3. tears the harness down on every exit path.
 
-`playwright.config.ts` points Playwright at the `https://` origin with
-`ignoreHTTPSErrors: true` (the origin is still a secure context, so the real
-`Secure` cookie path is exercised) and defines two projects: a 360 × 780 mobile
-viewport and the same with `reducedMotion: 'reduce'`.
+**No port number, hostname, IP, or deployment path is written in any tracked
+file** — every port is chosen by the OS at run time.
 
-Ports come from `ports.js` and can be overridden with `HMP_E2E_HTTP_PORT` /
-`HMP_E2E_HTTPS_PORT`.
+`playwright.config.ts` defines two projects: a 360 × 780 mobile viewport and the
+same with `reducedMotion: 'reduce'`, both with `ignoreHTTPSErrors: true` (the
+origin is still a secure context, so the real `Secure` cookie path is
+exercised).
 
 ## Running
 
@@ -38,21 +45,17 @@ npx playwright install chromium   # once
 npm run test:e2e
 ```
 
+Extra arguments are forwarded to `playwright test`, e.g.
+`npm run test:e2e -- --project=mobile`.
+
 ## Locally trusted certificate (optional)
 
 The default harness uses a self-signed certificate plus `ignoreHTTPSErrors`. If
-you prefer a certificate your browser trusts with no flag, run the built server
-yourself and put a terminator with a local CA in front of it — either:
-
-```sh
-# Caddy (provisions and trusts a local CA automatically)
-caddy reverse-proxy --from https://localhost:<https-port> --to localhost:<http-port>
-```
-
-```sh
-# or local-ssl-proxy (self-signed; still needs ignoreHTTPSErrors)
-npx local-ssl-proxy --source <https-port> --target <http-port>
-```
-
-Set the built server's `ORIGIN` to the `https://localhost:<https-port>` origin in
-either case.
+you prefer a certificate your browser trusts with no flag, run the pieces
+yourself: start the built server (`node build` with `PORT` and `ORIGIN` set),
+note the port it prints, and put a terminator with a local CA in front of it —
+either Caddy (`caddy reverse-proxy --from https://localhost:PORT --to
+localhost:PORT`, which provisions and trusts a local CA automatically) or
+`npx local-ssl-proxy --source PORT --target PORT` (self-signed; still needs
+`ignoreHTTPSErrors`). Set the built server's `ORIGIN` to the `https://localhost`
+origin in either case.

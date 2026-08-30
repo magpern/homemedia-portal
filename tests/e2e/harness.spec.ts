@@ -2,7 +2,7 @@ import {
 	HARNESS_ECHO_PATH,
 	HARNESS_PROBE_COOKIE,
 	HARNESS_SET_COOKIE_PATH
-} from '../harness/ports.js';
+} from '../harness/constants.js';
 import { expect, test } from './fixtures.js';
 
 /**
