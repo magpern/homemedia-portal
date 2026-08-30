@@ -1,0 +1,30 @@
+homemedia-portal bundled icons
+==============================
+
+Most files in this directory's `svg/` folder are redistributed from the
+Dashboard Icons project and are covered by the Apache License, Version 2.0.
+The full licence text is in the sibling `LICENSE` file. Provenance and the
+pinned upstream revision are recorded in `PROVENANCE.md`.
+
+Attribution
+-----------
+
+Dashboard Icons — https://github.com/homarr-labs/dashboard-icons
+Copyright (c) 2024 Bjorn Lammers, Meier Lukas, Thomas Camlong and Homarr Labs
+Licensed under the Apache License, Version 2.0 (see ./LICENSE).
+
+Trademark / identification-only notice
+-------------------------------------
+
+Reproduced from the upstream project's README:
+
+  All product names, trademarks and registered trademarks are the property of
+  their respective owners. Icons are used for identification purposes only and
+  do not imply endorsement.
+
+Original work
+-------------
+
+`svg/generic.svg` is an original work authored for homemedia-portal. It is not
+part of the Dashboard Icons project and carries no third-party rights. It is the
+neutral fallback used whenever a requested icon id is unknown.
