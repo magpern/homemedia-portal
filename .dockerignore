@@ -1,0 +1,50 @@
+# Build context filter for the production image (WP12). Everything the runtime
+# image must never carry — source is only in the build stage, tests/specs/docs
+# and all private/local files are excluded entirely.
+
+# VCS + CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# installed / generated in-image
+node_modules
+build
+.svelte-kit
+.output
+.vercel
+.netlify
+.wrangler
+
+# tests, specs, docs, tooling — never in the image
+tests
+specs
+docs
+playwright.config.ts
+.editorconfig
+.prettierignore
+prettier.config.js
+eslint.config.js
+.vscode
+.claude
+.specify
+.nvmrc
+
+# private / local / env — never in the image
+PRIVATE-CONTEXT.md
+.env
+.env.*
+*.local.*
+
+# artifacts
+coverage
+test-results
+playwright-report
+blob-report
+*.log
+
+# image build files themselves
+Dockerfile
+.dockerignore
+README.md
