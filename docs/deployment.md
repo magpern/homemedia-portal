@@ -33,12 +33,15 @@ owner-pushed `v<semver>` tag it runs the same gates followed by the publish job.
 
 ## Registry and tags
 
-CI publishes to this repository's **public** GitHub Container Registry package.
+CI publishes to this repository's GitHub Container Registry package. Its intended
+final visibility is **public**, so a host pulls it anonymously with no stored
+registry credential; the owner sets that once after the first publish (see
+[One-time owner action](#one-time-owner-action)).
 
-| Trigger                            | Published tag                                       |
-| ---------------------------------- | --------------------------------------------------- |
-| push to `main`                     | the immutable per-commit tag `sha-<short>` only     |
-| owner pushes a `v<semver>` git tag | the matching `v<semver>` image (plus `sha-<short>`) |
+| Trigger                            | Published tag                                   |
+| ---------------------------------- | ----------------------------------------------- |
+| push to `main`                     | the immutable per-commit tag `sha-<short>` only |
+| owner pushes a `v<semver>` git tag | the matching `v<semver>` tag only               |
 
 - **Never** `latest`, and never a mutable branch tag.
 - CI authenticates with the built-in `GITHUB_TOKEN` and least-privilege
@@ -51,9 +54,10 @@ CI publishes to this repository's **public** GitHub Container Registry package.
 
 ### One-time owner action
 
-Making the GHCR package **public** (so a host pulls it anonymously, with no
-stored registry credential) is a one-time setting in the package's visibility
-options. It is **not** automated by CI.
+After the first publish, the owner sets the GHCR package's visibility to
+**public** — its intended final state — so a host pulls it anonymously with no
+stored registry credential. This is a one-time setting in the package's
+visibility options and is **not** automated by CI.
 
 ## Release flow
 
