@@ -106,8 +106,12 @@ export function applySecurityHeaders(headers: Headers): void {
 	}
 }
 
-/** Paths whose responses must never be stored, in addition to all HTML. */
-const MACHINE_ENDPOINTS = new Set(['/healthz', '/api/services']);
+/**
+ * Paths whose responses must never be stored, in addition to all HTML — the
+ * machine endpoints plus the auth routes (so a redirect off `/login` / `/logout`,
+ * which carries no HTML content-type, is still `no-store`).
+ */
+const MACHINE_ENDPOINTS = new Set(['/healthz', '/api/services', '/login', '/logout']);
 
 /** Prefix of content-hashed, immutable build assets. */
 const IMMUTABLE_PREFIX = '/_app/immutable/';

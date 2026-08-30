@@ -25,3 +25,12 @@ export const HARNESS_ECHO_PATH = `${HARNESS_PREFIX}/echo`;
 
 /** Name of the `Secure` cookie the fixture sets, for the smoke assertion. */
 export const HARNESS_PROBE_COOKIE = '__hmp_https_probe';
+
+/**
+ * Env vars carrying the throwaway credentials the harness generates each run for
+ * the auth/session e2e specs. The password and secret are random per run and
+ * never written to a tracked file (Constitution IX).
+ */
+export const E2E_USERNAME_ENV = 'HMP_E2E_USERNAME';
+export const E2E_PASSWORD_ENV = 'HMP_E2E_PASSWORD';
+export const E2E_SESSION_SECRET_ENV = 'HMP_E2E_SESSION_SECRET';

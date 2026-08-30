@@ -40,5 +40,8 @@
 		"typescript-eslint": "8.68.0",
 		"vite": "8.2.2",
 		"vitest": "4.1.11"
+	},
+	"dependencies": {
+		"hash-wasm": "4.12.0"
 	}
 }
