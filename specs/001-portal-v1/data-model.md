@@ -40,8 +40,8 @@ table; summary:
 | `homemedia.icon` | string (bundled id) | image-name guess → `generic` | must match a bundled icon id; unknown → `generic`, no fetch |
 | `homemedia.category` | string | `"Services"` | trimmed; whitespace collapsed; grouping key = casefold |
 | `homemedia.description` | string | `undefined` | trimmed; optional |
-| `homemedia.url` | string | derived (see §3) | must parse as absolute `http(s)` URL |
-| `homemedia.port` | integer | `undefined` | 1–65535 |
+| `homemedia.url` | string | derived (see §3) | absolute `http`/`https` URL; complete explicit destination, always wins over `port` |
+| `homemedia.port` | integer | `undefined` | 1–65535; builds an **`http://`-only** link with `SERVICE_LINK_BASE` (never HTTPS — use `url` for that) |
 | `homemedia.order` | integer | `100` | any integer; invalid → `100` |
 | `homemedia.lan_only` | boolean | `false` | `true`/`1`/`yes` (ci) → `true` |
 
@@ -72,15 +72,20 @@ Derived from `RawContainer` + `LabelSet` + status mapping. Ephemeral; never stor
 | `status` | `'up' \| 'down' \| 'unknown'` | §4 |
 | `statusLabel` | string | human text: "Running", "Not running", "Starting", "Status unavailable" |
 
-**`href` resolution (first match wins):**
+**`href` resolution (first match wins)** — product-owner decision 2026-08-30:
 
-1. `LabelSet.url` present and a valid absolute `http(s)` URL → use it.
-2. `LabelSet.port` present and a link-base host template is configured for the
-   deployment → compose `<scheme>://<base-host>:<port>`.
+1. `LabelSet.url` present and a valid absolute `http`/`https` URL → use it
+   verbatim. This is the complete explicit destination and always takes
+   precedence. **Any non-default scheme (HTTPS, or anything other than plain
+   `http`) requires this label** — it is never inferred.
+2. `LabelSet.port` present (and no valid `url`) and the private `SERVICE_LINK_BASE`
+   is configured → build **`http://<SERVICE_LINK_BASE>:<port>`** — always plain
+   `http`. TLS is never guessed; a service reached over HTTPS must set
+   `homemedia.url`.
 3. Otherwise → `null` (tile shows "link unconfigured", not a guessed URL).
 
-The link-base host template is deployment configuration (private); it never appears
-in tracked files.
+`SERVICE_LINK_BASE` is deployment configuration held only in untracked private
+operator notes; it (and the resulting host/port) never appears in tracked files.
 
 ---
 
@@ -200,7 +205,7 @@ Client IP from `event.getClientAddress()` (honours `ADDRESS_HEADER` + `XFF_DEPTH
 | `PORTAL_PASSWORD_ARGON2` | yes | parses as a PHC Argon2id string | never logged |
 | `SESSION_SECRET` | yes | ≥ 32 bytes after decoding | never logged; rotate → global logout |
 | `DOCKER_PROXY_URL` | yes | absolute `http(s)` URL | internal-network URL of the socket-proxy; concrete value in operator notes only |
-| `SERVICE_LINK_BASE` | no | host template if present | enables `homemedia.port` links |
+| `SERVICE_LINK_BASE` | no | host (no scheme, no port) if present | with `homemedia.port` builds `http://<SERVICE_LINK_BASE>:<port>` — `http` only (§3); value stays in private operator notes |
 | `ORIGIN` | yes (prod) | absolute `https` URL | adapter-node; local test = a local `https://` origin (research R11) |
 | `PROTOCOL_HEADER` / `HOST_HEADER` / `ADDRESS_HEADER` / `XFF_DEPTH` | recommended | adapter-node forwarded-header config |
 | `BODY_SIZE_LIMIT` | no | small default | |

@@ -47,20 +47,24 @@ Examples below use placeholder names only — no real service inventory.
 
 ### `homemedia.url`
 
-- Type: string — an absolute `http(s)` URL.
-- If valid, it is the tile's link target and takes precedence over
-  `homemedia.port`.
-- If present but not a valid absolute `http(s)` URL → ignored (fall through to
+- Type: string — an absolute `http` or `https` URL.
+- If valid, it is the **complete explicit destination** and always takes
+  precedence over `homemedia.port`.
+- **Required for any HTTPS (or non-default-scheme) destination** — the portal
+  never infers TLS.
+- If present but not a valid absolute `http`/`https` URL → ignored (fall through to
   `port`, then to "link unconfigured").
 
 ### `homemedia.port`
 
 - Type: integer 1–65535.
-- Used only when `homemedia.url` is absent/invalid **and** the deployment has a
-  link-base host template configured. Resulting link:
-  `<scheme>://<base-host>:<port>` (base host is private deployment config).
-- If neither `url` nor a usable `port`+base yields a valid absolute URL, the tile
-  shows "link unconfigured" and is not a link (FR-018).
+- Used only when `homemedia.url` is absent/invalid **and** the deployment has
+  `SERVICE_LINK_BASE` configured. Resulting link is **always plain
+  `http`**: `http://<SERVICE_LINK_BASE>:<port>` (`SERVICE_LINK_BASE` is private
+  deployment config). TLS is never guessed — an HTTPS service must use
+  `homemedia.url`.
+- If neither `url` nor a usable `port` + `SERVICE_LINK_BASE` yields a valid
+  absolute URL, the tile shows "link unconfigured" and is not a link (FR-018).
 
 ### `homemedia.order`
 
@@ -98,7 +102,7 @@ labels:
   homemedia.icon: "example"          # must be a bundled id; else -> generic
   homemedia.category: "Media"
   homemedia.description: "Watch things"
-  homemedia.url: "https://example.internal/"   # wins over port
+  homemedia.url: "https://example.invalid/"   # explicit; required for HTTPS; wins over port
   homemedia.order: "10"
   homemedia.lan_only: "false"
 ```
@@ -108,6 +112,6 @@ labels:
   homemedia.enable: "true"
   homemedia.name: "Admin Panel"
   homemedia.category: "Ops"
-  homemedia.port: "9999"            # link built from base-host + 9999
-  homemedia.lan_only: "true"        # shows "LAN only" badge
+  homemedia.port: "<port>"         # link = http://<SERVICE_LINK_BASE>:<port>  (http only, never https)
+  homemedia.lan_only: "true"       # shows "LAN only" badge
 ```
