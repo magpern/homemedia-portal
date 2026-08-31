@@ -46,23 +46,28 @@ spec hermetic.
 
 `run-e2e.mjs` also starts an in-process **stub Docker socket-proxy**
 (`docker-mock.mjs`) serving only the two contract `GET` endpoints plus a
-`POST /__control` scenario switch (`normal` / `inspect-fail` / `discovery-fail`);
-its fixtures are entirely synthetic (generic call-signs, reserved
-non-resolvable hosts, a derived port). Helpers in `tests/e2e/dashboard-harness.ts`
-sign in by forging a session cookie with the run's real secret (no login, no
-throttle) and flip the stub scenario.
+`POST /__control` side channel: a scenario switch (`normal` / `inspect-fail` /
+`discovery-fail`) and an optional `containers` array that replaces the default
+fixture for the curation-lifecycle spec (the portal is SSR, so the next
+navigation re-reads the stub — an operator editing labels with no restart). Its
+fixtures are entirely synthetic (generic call-signs, reserved non-resolvable
+hosts, a derived port). Helpers in `tests/e2e/dashboard-harness.ts` sign in by
+forging a session cookie with the run's real secret (no login, no throttle) and
+flip the stub scenario / fixture.
 
 ## Test files
 
-| Spec                | Covers                                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `harness.spec.ts`   | WP11a — the harness itself serves over HTTPS and a `Secure` cookie round-trips                                                 |
-| `auth.spec.ts`      | WP2 — login, logout, session expiry, secret rotation, throttle                                                                 |
-| `authz.spec.ts`     | WP3 — unauthenticated route guard, `/api/*` 401, safe redirects                                                                |
-| `dashboard.spec.ts` | WP5/WP6 — grouping, search, link states, status, isolation, FR-030 failure modes                                               |
-| `healthz.spec.ts`   | WP10 — `/healthz` is public, `ok`, no-store, stays healthy when the Docker source is down                                      |
-| `a11y.spec.ts`      | WP11b — axe (0 serious/critical), landmarks, one `h1`, native focusable controls, status not colour-alone, on `/login` and `/` |
-| `mobile.spec.ts`    | WP11b — no horizontal scroll and ≥ 44px targets at 360px, and no motion in the reduced-motion project, on `/login` and `/`     |
+| Spec                | Covers                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `harness.spec.ts`   | WP11a — the harness itself serves over HTTPS and a `Secure` cookie round-trips                                                  |
+| `auth.spec.ts`      | WP2 — login, logout, session expiry, secret rotation, throttle                                                                  |
+| `authz.spec.ts`     | WP3 — unauthenticated route guard, `/api/*` 401, safe redirects                                                                 |
+| `dashboard.spec.ts` | WP5/WP6 — grouping, search, link states, status, isolation, FR-030 failure modes                                                |
+| `curation.spec.ts`  | WP8 — label add/change/remove takes effect on next load (no restart); unknown icon → generic, no fetch; category variants merge |
+| `pwa.spec.ts`       | WP9 — manifest installability criteria, service-worker cache is static-assets-only, dynamic/authed responses never cached       |
+| `healthz.spec.ts`   | WP10 — `/healthz` is public, `ok`, no-store, stays healthy when the Docker source is down                                       |
+| `a11y.spec.ts`      | WP11b — axe (0 serious/critical), landmarks, one `h1`, native focusable controls, status not colour-alone, on `/login` and `/`  |
+| `mobile.spec.ts`    | WP11b — no horizontal scroll and ≥ 44px targets at 360px, and no motion in the reduced-motion project, on `/login` and `/`      |
 
 ## Running
 
