@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-31
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "A friendly home view for the portal. The current portal is
 technically correct but feels like an operations dashboard. The new experience should feel
