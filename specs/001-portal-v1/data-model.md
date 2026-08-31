@@ -44,6 +44,8 @@ table; summary:
 | `homemedia.port` | integer | `undefined` | 1–65535; builds an **`http://`-only** link with `SERVICE_LINK_BASE` (never HTTPS — use `url` for that) |
 | `homemedia.order` | integer | `100` | any integer; invalid → `100` |
 | `homemedia.lan_only` | boolean | `false` | `true`/`1`/`yes` (ci) → `true` |
+| `homemedia.placement` *(feature 002)* | enum `home`\|`manage` | `manage` | casefold; `home` → `home`; anything else → `manage` |
+| `homemedia.home_label` *(feature 002)* | string | `null` | trimmed; used only when `placement=home`; primary-card title = `home_label` ?? `name` |
 
 Parsing rules:
 
