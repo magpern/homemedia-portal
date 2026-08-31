@@ -17,6 +17,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { chromium } from '@playwright/test';
 import { startHarness } from './serve-https.mjs';
 import { startDockerMock } from './docker-mock.mjs';
 import {
@@ -51,6 +52,39 @@ process.env.SERVICE_LINK_BASE = E2E_SERVICE_LINK_BASE;
 
 const harness = await startHarness();
 
+/**
+ * The `pwa` Playwright project needs the full `channel: 'chromium'` build (real
+ * Service-Worker threads + Chrome's installability CDP calls). Run it whenever
+ * that browser can launch
+ * — always in CI (`playwright install --with-deps chromium`), and locally when
+ * the host has the libraries. A library-starved sandbox cannot, so the project
+ * is left out there with a clear message rather than failing the run.
+ */
+async function fullChromiumUsable() {
+	try {
+		const browser = await chromium.launch({ channel: 'chromium' });
+		await browser.close();
+		return true;
+	} catch (err) {
+		return String(err?.message ?? err);
+	}
+}
+
+const projects = ['mobile', 'mobile-reduced-motion'];
+const explicitProject = process.argv.slice(2).some((a) => a.startsWith('--project'));
+if (!explicitProject) {
+	const chromium1 = await fullChromiumUsable();
+	if (chromium1 === true) {
+		projects.push('pwa');
+	} else {
+		console.warn(
+			`\n[run-e2e] SKIPPING the "pwa" project: full Chrome for Testing could not launch ` +
+				`in this environment — it runs in CI. Reason: ${chromium1}\n`
+		);
+	}
+}
+const projectArgs = explicitProject ? [] : projects.flatMap((p) => ['--project', p]);
+
 let stopping = false;
 async function stopHarness() {
 	if (stopping) return;
@@ -59,17 +93,21 @@ async function stopHarness() {
 	await dockerMock.stop().catch(() => {});
 }
 
-const playwright = spawn(process.execPath, [playwrightCli, 'test', ...process.argv.slice(2)], {
-	stdio: 'inherit',
-	env: {
-		...process.env,
-		[HTTPS_URL_ENV]: harness.httpsUrl,
-		[E2E_USERNAME_ENV]: e2eUsername,
-		[E2E_PASSWORD_ENV]: e2ePassword,
-		[E2E_SESSION_SECRET_ENV]: e2eSessionSecret,
-		[E2E_DOCKER_MOCK_ENV]: dockerMock.url
+const playwright = spawn(
+	process.execPath,
+	[playwrightCli, 'test', ...projectArgs, ...process.argv.slice(2)],
+	{
+		stdio: 'inherit',
+		env: {
+			...process.env,
+			[HTTPS_URL_ENV]: harness.httpsUrl,
+			[E2E_USERNAME_ENV]: e2eUsername,
+			[E2E_PASSWORD_ENV]: e2ePassword,
+			[E2E_SESSION_SECRET_ENV]: e2eSessionSecret,
+			[E2E_DOCKER_MOCK_ENV]: dockerMock.url
+		}
 	}
-});
+);
 
 playwright.on('exit', async (code, signal) => {
 	await stopHarness();

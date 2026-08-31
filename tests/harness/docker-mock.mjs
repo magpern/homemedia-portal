@@ -16,6 +16,13 @@
  *                        (FR-030(a) / SC-009: list all, mark that one unknown).
  *   - `discovery-fail` — `GET /containers/json` 500s
  *                        (FR-030(b) / SC-015: explicit unavailable, no list).
+ *
+ * `POST /__control` also accepts a `containers` array (+ optional `inspect` map)
+ * to replace the default fixture for the curation-lifecycle spec (WP8): the
+ * portal is SSR, so the next navigation to `/` re-reads this stub — that models
+ * an operator editing `homemedia.*` labels and re-applying a container with **no
+ * portal restart**. Every `/__control` call fully defines the state; omitting
+ * `containers` restores the defaults.
  */
 import { createServer } from 'node:http';
 import { E2E_FIXTURE_PORT, HARNESS_HOST } from './constants.js';
@@ -127,6 +134,11 @@ function sendJson(res, status, body) {
  */
 export async function startDockerMock() {
 	let mode = 'normal';
+	/** `null` → serve the default fixture; otherwise the spec-supplied override. */
+	let override = null;
+
+	const containersNow = () => (override ? override.containers : CONTAINERS);
+	const inspectNow = () => (override ? override.inspect : INSPECT);
 
 	const server = createServer((req, res) => {
 		const path = (req.url ?? '/').split('?')[0];
@@ -137,12 +149,17 @@ export async function startDockerMock() {
 				raw += chunk;
 			});
 			req.on('end', () => {
+				let body;
 				try {
-					mode = JSON.parse(raw).mode ?? 'normal';
+					body = JSON.parse(raw);
 				} catch {
-					mode = 'normal';
+					body = {};
 				}
-				sendJson(res, 200, { mode });
+				mode = body.mode ?? 'normal';
+				override = Array.isArray(body.containers)
+					? { containers: body.containers, inspect: body.inspect ?? {} }
+					: null;
+				sendJson(res, 200, { mode, override: override !== null });
 			});
 			return;
 		}
@@ -157,7 +174,7 @@ export async function startDockerMock() {
 				res.writeHead(500).end('discovery unavailable');
 				return;
 			}
-			sendJson(res, 200, CONTAINERS);
+			sendJson(res, 200, containersNow());
 			return;
 		}
 
@@ -168,7 +185,11 @@ export async function startDockerMock() {
 				res.writeHead(500).end('inspect unavailable');
 				return;
 			}
-			const body = INSPECT[id];
+			const table = inspectNow();
+			// Default fixture: an unknown id is a 404 (drives the "inspect failed"
+			// path). Curation override: unknown ids default to a plain running
+			// state so a spec only has to declare labels, not per-id status.
+			const body = table[id] ?? (override ? { State: { Status: 'running' } } : null);
 			if (!body) {
 				res.writeHead(404).end();
 				return;

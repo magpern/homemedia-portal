@@ -38,3 +38,27 @@ export async function setDockerMode(
 	const res = await request.post(new URL('/__control', mockBase()).href, { data: { mode } });
 	if (!res.ok()) throw new Error(`docker mock refused mode "${mode}" (${res.status()})`);
 }
+
+/** One raw container as the stub Docker source returns it (`GET /containers/json`). */
+export interface MockContainer {
+	Id: string;
+	Names: string[];
+	Image: string;
+	State: string;
+	Labels: Record<string, string>;
+}
+
+/**
+ * Replace the stub Docker fixture with `containers` (curation-lifecycle spec,
+ * WP8). The portal is SSR, so the change takes effect on the next navigation to
+ * `/` with **no server restart** — the operator-edits-a-label scenario. Call
+ * with `null` to restore the default fixture.
+ */
+export async function setCurationFixture(
+	request: APIRequestContext,
+	containers: MockContainer[] | null
+): Promise<void> {
+	const data = containers ? { mode: 'normal', containers } : { mode: 'normal' };
+	const res = await request.post(new URL('/__control', mockBase()).href, { data });
+	if (!res.ok()) throw new Error(`docker mock refused curation fixture (${res.status()})`);
+}

@@ -8,8 +8,8 @@ reverse proxy; the portal terminates no TLS and owns no public network edge.
 
 ## Status
 
-In development, spec-driven. It is **not deployable yet** — no Dockerfile,
-Compose, CI, or deployment configuration exists in this repository at this stage.
+In development, spec-driven. A production container image and its CI build/publish
+workflow exist; the reverse-proxy / external-access acceptance gate does not.
 
 - Governance: [`.specify/memory/constitution.md`](.specify/memory/constitution.md)
 - Specification, plan, research, data model, contracts, and the task breakdown:
@@ -37,6 +37,25 @@ Runtime configuration is validated at startup; see
 [`specs/001-portal-v1/data-model.md`](specs/001-portal-v1/data-model.md) §9.
 Concrete infrastructure values are never committed — they live only in an
 untracked local `PRIVATE-CONTEXT.md`.
+
+## Curating the menu
+
+The portal shows a container **only** when it carries `homemedia.enable=true`,
+and every part of the tile — display name, category, icon, link destination,
+"LAN only" marker, ordering — is driven by `homemedia.*` labels set on that
+container in its own Compose definition. Nothing else is read; unlabelled
+containers are never listed, counted, or hinted at.
+
+Add or edit the labels, re-apply that one service, and reload the portal — the
+change takes effect on the next page load with **no portal rebuild or restart**.
+Removing `homemedia.enable` removes the tile.
+
+The full key list, accepted values, defaults, and the `url`-vs-`port` link rules
+(the portal never infers HTTPS — an HTTPS destination needs an explicit
+`homemedia.url`) are in
+[`contracts/label-contract.md`](specs/001-portal-v1/contracts/label-contract.md).
+An unknown `homemedia.icon` value falls back to the generic glyph; the portal
+never fetches an icon.
 
 ## Icon attribution
 

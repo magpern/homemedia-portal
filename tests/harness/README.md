@@ -36,33 +36,47 @@ cookie for tests is forbidden.
 **No IP address or concrete port number is written in any tracked file** — the
 only host is `localhost` and every port is chosen by the OS at run time.
 
-`playwright.config.ts` defines two projects: a 360 × 780 mobile viewport and the
-same with `reducedMotion: 'reduce'`, both with `ignoreHTTPSErrors: true` (the
-origin is still a secure context, so the real `Secure` cookie path is
-exercised). The suite runs **single-worker** (`workers: 1`) — every spec shares
-one built server process whose in-memory login throttle and stub Docker source
-are process-global, so serial execution + per-spec `beforeEach` reset keeps each
-spec hermetic.
+`playwright.config.ts` defines three projects: `mobile` (360 × 780), the same
+with `reducedMotion: 'reduce'`, and `pwa` — which runs only `pwa.spec.ts` on the
+full `channel: 'chromium'` build because `chromium-headless-shell` (the default
+for the other two) does not run Service-Worker threads. All use
+`ignoreHTTPSErrors: true` (the origin is still a secure context, so the real
+`Secure` cookie path is exercised). The suite runs **single-worker**
+(`workers: 1`) — every spec shares one built server process whose in-memory login
+throttle and stub Docker source are process-global, so serial execution +
+per-spec `beforeEach` reset keeps each spec hermetic.
+
+`run-e2e.mjs` adds the `pwa` project **only when full Chrome for Testing can
+launch** — always in CI (`playwright install --with-deps chromium`), and locally
+when the host has the libraries. A library-starved sandbox that cannot launch it
+gets a printed `[run-e2e] SKIPPING the "pwa" project …` line instead of a failed
+run; those checks then run in CI. `tests/unit/service-worker.spec.ts` guards the
+same static-only invariant on every platform with no browser.
 
 `run-e2e.mjs` also starts an in-process **stub Docker socket-proxy**
 (`docker-mock.mjs`) serving only the two contract `GET` endpoints plus a
-`POST /__control` scenario switch (`normal` / `inspect-fail` / `discovery-fail`);
-its fixtures are entirely synthetic (generic call-signs, reserved
-non-resolvable hosts, a derived port). Helpers in `tests/e2e/dashboard-harness.ts`
-sign in by forging a session cookie with the run's real secret (no login, no
-throttle) and flip the stub scenario.
+`POST /__control` side channel: a scenario switch (`normal` / `inspect-fail` /
+`discovery-fail`) and an optional `containers` array that replaces the default
+fixture for the curation-lifecycle spec (the portal is SSR, so the next
+navigation re-reads the stub — an operator editing labels with no restart). Its
+fixtures are entirely synthetic (generic call-signs, reserved non-resolvable
+hosts, a derived port). Helpers in `tests/e2e/dashboard-harness.ts` sign in by
+forging a session cookie with the run's real secret (no login, no throttle) and
+flip the stub scenario / fixture.
 
 ## Test files
 
-| Spec                | Covers                                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `harness.spec.ts`   | WP11a — the harness itself serves over HTTPS and a `Secure` cookie round-trips                                                 |
-| `auth.spec.ts`      | WP2 — login, logout, session expiry, secret rotation, throttle                                                                 |
-| `authz.spec.ts`     | WP3 — unauthenticated route guard, `/api/*` 401, safe redirects                                                                |
-| `dashboard.spec.ts` | WP5/WP6 — grouping, search, link states, status, isolation, FR-030 failure modes                                               |
-| `healthz.spec.ts`   | WP10 — `/healthz` is public, `ok`, no-store, stays healthy when the Docker source is down                                      |
-| `a11y.spec.ts`      | WP11b — axe (0 serious/critical), landmarks, one `h1`, native focusable controls, status not colour-alone, on `/login` and `/` |
-| `mobile.spec.ts`    | WP11b — no horizontal scroll and ≥ 44px targets at 360px, and no motion in the reduced-motion project, on `/login` and `/`     |
+| Spec                | Covers                                                                                                                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `harness.spec.ts`   | WP11a — the harness itself serves over HTTPS and a `Secure` cookie round-trips                                                                                                                             |
+| `auth.spec.ts`      | WP2 — login, logout, session expiry, secret rotation, throttle                                                                                                                                             |
+| `authz.spec.ts`     | WP3 — unauthenticated route guard, `/api/*` 401, safe redirects                                                                                                                                            |
+| `dashboard.spec.ts` | WP5/WP6 — grouping, search, link states, status, isolation, FR-030 failure modes                                                                                                                           |
+| `curation.spec.ts`  | WP8 — label add/change/remove takes effect on next load (no restart); unknown icon → generic, no fetch; category variants merge                                                                            |
+| `pwa.spec.ts`       | WP9 — `pwa` project: Chrome `Page.getAppManifest` installability check, live service-worker cache is static-only, offline navigation not cached, dynamic/authed + `/api/services` responses are `no-store` |
+| `healthz.spec.ts`   | WP10 — `/healthz` is public, `ok`, no-store, stays healthy when the Docker source is down                                                                                                                  |
+| `a11y.spec.ts`      | WP11b — axe (0 serious/critical), landmarks, one `h1`, native focusable controls, status not colour-alone, on `/login` and `/`                                                                             |
+| `mobile.spec.ts`    | WP11b — no horizontal scroll and ≥ 44px targets at 360px, and no motion in the reduced-motion project, on `/login` and `/`                                                                                 |
 
 ## Running
 

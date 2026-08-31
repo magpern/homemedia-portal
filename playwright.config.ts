@@ -18,6 +18,14 @@ import { HTTPS_URL_ENV } from './tests/harness/constants.js';
  * Docker source (one scenario at a time) are process-global. Serialising the
  * whole run makes each spec hermetic via its own `beforeEach` and removes the
  * only source of cross-spec flakiness. The suite is small; the cost is seconds.
+ *
+ * `pwa.spec.ts` runs in its own **`pwa`** project on the full `channel: 'chromium'`
+ * build: `chromium-headless-shell` (the default for the other projects) does not
+ * run Service-Worker threads, so the SW cache / offline checks and Chrome's
+ * installability CDP calls need Chrome for Testing. `tests/harness/run-e2e.mjs`
+ * only adds this project when that browser can actually launch (it can in CI via
+ * `playwright install --with-deps chromium`; it cannot in a library-starved
+ * sandbox) — see that file and `tests/harness/README.md`.
  */
 // Set by `tests/harness/run-e2e.mjs` (the `test:e2e` script). Running
 // `playwright test` directly without it leaves `baseURL` unset and the specs
@@ -39,11 +47,33 @@ export default defineConfig({
 	projects: [
 		{
 			name: 'mobile',
+			testIgnore: /pwa\.spec\.ts/,
 			use: { viewport: { width: 360, height: 780 } }
 		},
 		{
 			name: 'mobile-reduced-motion',
+			testIgnore: /pwa\.spec\.ts/,
 			use: { viewport: { width: 360, height: 780 }, reducedMotion: 'reduce' }
+		},
+		{
+			name: 'pwa',
+			testMatch: /pwa\.spec\.ts/,
+			// Full Chrome for Testing — needs real Service-Worker threads.
+			//  --no-sandbox: CI runs as root.
+			//  --ignore-certificate-errors: the harness cert is self-signed and the
+			//  Service-Worker thread's precache fetches are not covered by
+			//  Playwright's per-context `ignoreHTTPSErrors`.
+			use: {
+				viewport: { width: 360, height: 780 },
+				channel: 'chromium',
+				launchOptions: {
+					args: [
+						'--no-sandbox',
+						'--ignore-certificate-errors',
+						'--allow-insecure-localhost'
+					]
+				}
+			}
 		}
 	]
 });
