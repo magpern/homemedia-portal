@@ -37,7 +37,12 @@ Additive to Portal v1 §3.
 |---|---|---|
 | `placement` | `'home' \| 'manage'` | `LabelSet.placement` |
 | `homeLabel` | `string \| null` | `LabelSet.homeLabel` (only meaningful when `placement === 'home'`) |
-| `description` | `string \| undefined` | **unchanged field, new fallback**: `LabelSet.description` when present; otherwise the deterministic placement fallback string (see §3) — so a projected service on the friendly view **always** has display description text |
+| `description` | `string \| undefined` | **unchanged** — the raw `homemedia.description` (or `undefined`). |
+
+The deterministic fallback (§3) is applied at the **view layer** (`resolveDescription`
+in `$lib/description.ts`), not baked into the projection: the friendly primary/manage
+cards always show text, while the no-home fallback view stays byte-for-behaviour the
+Portal v1 dashboard (a card with no `homemedia.description` shows none there — SC-109).
 
 Primary-card title (view-level, not stored): `homeLabel ?? name` where `name` already
 resolves `homemedia.name` → de-slugified container name.

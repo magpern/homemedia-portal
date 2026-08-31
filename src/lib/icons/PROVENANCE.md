@@ -38,8 +38,20 @@ Copied verbatim from `svg/<id>.svg` at the pinned commit:
 | `dashboard-icons` | `svg/dashboard-icons.svg` |
 | `docker`          | `svg/docker.svg`          |
 
-`svg/generic.svg` is **not** from upstream — it is an original neutral glyph
-authored for this project and used as the safe fallback for any unknown icon id.
+### Original glyphs authored for this project (not from upstream)
+
+These carry no third-party rights. Each names a **role**, never a product, so the
+tracked id list discloses nothing about the deployment's service inventory
+(feature 002 — Friendly Home View, research FHV-R4).
+
+| Bundled id | Role it represents                    |
+| ---------- | ------------------------------------- |
+| `generic`  | safe fallback for any unknown icon id |
+| `watch`    | watch / play a media library          |
+| `request`  | search for / request new content      |
+| `download` | download client / transfers           |
+| `settings` | configuration / management tool       |
+| `activity` | monitoring / statistics               |
 
 This is a deliberately minimal, generic foundation. The full icon set is grown in
 later work packages, driven by the operator's own service list (kept in untracked

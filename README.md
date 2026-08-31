@@ -57,6 +57,22 @@ The full key list, accepted values, defaults, and the `url`-vs-`port` link rules
 An unknown `homemedia.icon` value falls back to the generic glyph; the portal
 never fetches an icon.
 
+### Friendly Home View
+
+The landing view leads with the household's main actions and tucks the operator
+tools into a collapsed **Manage media** section. Two optional labels drive it:
+
+- `homemedia.placement` — `home` puts the service on the landing view as a large
+  primary-action card; `manage` (the default) keeps it inside "Manage media".
+- `homemedia.home_label` — the action-phrased card title for a `home` service
+  (e.g. `"Watch the library"`); falls back to `homemedia.name`.
+
+With **no** service marked `homemedia.placement=home`, the landing view is the
+plain grouped dashboard, unchanged. Every card shows `homemedia.description`; set
+a meaningful one on each service — a missing one falls back to a fixed generic
+sentence. See
+[`specs/002-friendly-home-view/`](specs/002-friendly-home-view/).
+
 ## Icon attribution
 
 Service icons are resolved from a small set bundled into the build under

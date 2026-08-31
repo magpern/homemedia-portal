@@ -65,7 +65,7 @@ test.describe('authentication (WP2)', () => {
 	}) => {
 		await submitLogin(page, PASSWORD);
 		await page.waitForURL(`${ORIGIN}/`);
-		await expect(page.locator('h1')).toHaveText('homemedia-portal');
+		await expect(page.locator('h1')).toHaveText('Home media');
 
 		const cookie = sessionCookie(await context.cookies());
 		expect(cookie, 'session cookie present').toBeTruthy();
@@ -97,7 +97,7 @@ test.describe('authentication (WP2)', () => {
 		const secondPage = await second.newPage();
 		const res = await secondPage.goto('/');
 		expect(res!.url()).toBe(`${ORIGIN}/`);
-		await expect(secondPage.locator('h1')).toHaveText('homemedia-portal');
+		await expect(secondPage.locator('h1')).toHaveText('Home media');
 		await second.close();
 	});
 

@@ -16,7 +16,18 @@
 	import LanOnlyBadge from './LanOnlyBadge.svelte';
 	import StatusIndicator from './StatusIndicator.svelte';
 
-	let { service }: { service: ServiceProjection } = $props();
+	/**
+	 * `descriptionFallback` (feature 002): text to show when the service has no
+	 * `homemedia.description`. Passed by the "Manage media" section; omitted on the
+	 * Portal v1 fallback view so that view is unchanged (a card with no description
+	 * simply shows none).
+	 */
+	let {
+		service,
+		descriptionFallback = null
+	}: { service: ServiceProjection; descriptionFallback?: string | null } = $props();
+
+	const description = $derived(service.description ?? descriptionFallback ?? null);
 </script>
 
 {#snippet body()}
@@ -25,8 +36,8 @@
 		<span class="name">{service.name}</span>
 		{#if service.lanOnly}<LanOnlyBadge />{/if}
 	</span>
-	{#if service.description}
-		<span class="description">{service.description}</span>
+	{#if description}
+		<span class="description">{description}</span>
 	{/if}
 	<span class="card-foot">
 		<StatusIndicator status={service.status} label={service.statusLabel} />

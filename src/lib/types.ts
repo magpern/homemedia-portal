@@ -41,6 +41,17 @@ export interface ServiceProjection {
 	status: ServiceStatus;
 	/** Human-readable status text ("Running", "Not running", "Starting", "Status unavailable"). */
 	statusLabel: string;
+	/**
+	 * Landing-view placement (feature 002). `home` → large primary-action card;
+	 * `manage` (default) → inside the collapsed "Manage media" section.
+	 */
+	placement: 'home' | 'manage';
+	/**
+	 * `homemedia.home_label` (feature 002) — action-phrased primary-card title, or
+	 * `null`. Only meaningful when `placement === 'home'`; the card title resolves
+	 * `homeLabel ?? name`.
+	 */
+	homeLabel: string | null;
 }
 
 /** A display grouping of services (data-model §5). */
@@ -76,8 +87,27 @@ export interface DashboardModel {
 	generatedAt: string;
 	/** `false` only when labelled-service discovery itself failed. */
 	sourceOk: boolean;
-	/** Grouped services; `[]` when `sourceOk` is `false` or none are labelled. */
+	/**
+	 * The Portal v1 grouped view of **every** discovered service. Retained
+	 * unconditionally: it is what the landing view renders in the no-home
+	 * fallback (feature 002), and it keeps the totals honest.
+	 * `[]` when `sourceOk` is `false` or none are labelled.
+	 */
 	categories: Category[];
+	/**
+	 * Feature 002 — services with `placement === 'home'`, sorted by `order` asc
+	 * then `name`. Rendered as large primary-action cards. Empty → the landing
+	 * view falls back to {@link categories}. Disjoint from {@link manage}.
+	 */
+	primary: ServiceProjection[];
+	/**
+	 * Feature 002 — the Portal v1 grouping applied to `placement === 'manage'`
+	 * services only; the contents of the collapsed "Manage media" section.
+	 * Disjoint from {@link primary}; `primary ∪ manage` = every discovered service.
+	 */
+	manage: Category[];
+	/** Feature 002 — number of `placement === 'manage'` services (for the disclosure control). */
+	manageCount: number;
 	counts: DashboardCounts;
 }
 

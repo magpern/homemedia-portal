@@ -28,3 +28,8 @@ Original work
 `svg/generic.svg` is an original work authored for homemedia-portal. It is not
 part of the Dashboard Icons project and carries no third-party rights. It is the
 neutral fallback used whenever a requested icon id is unknown.
+
+`svg/watch.svg`, `svg/request.svg`, `svg/download.svg`, `svg/settings.svg`, and
+`svg/activity.svg` are likewise original works authored for homemedia-portal
+(feature 002). They are neutral role glyphs — not brand marks — and carry no
+third-party rights. See PROVENANCE.md.
