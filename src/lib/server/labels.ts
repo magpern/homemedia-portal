@@ -24,6 +24,16 @@ const LABEL_PREFIX = 'homemedia.';
 /** Default category when `homemedia.category` is absent or blank. */
 export const DEFAULT_CATEGORY = 'Services';
 
+/**
+ * Landing-view placement (feature 002 — Friendly Home View). `home` promotes the
+ * service to a large primary-action card; `manage` (the default) keeps it inside
+ * the collapsed "Manage media" section — i.e. the Portal v1 behaviour.
+ */
+export type Placement = 'home' | 'manage';
+
+/** Default placement when `homemedia.placement` is absent, blank, or unrecognised. */
+export const DEFAULT_PLACEMENT: Placement = 'manage';
+
 /** Default sort weight when `homemedia.order` is absent or malformed. */
 export const DEFAULT_ORDER = 100;
 
@@ -60,6 +70,24 @@ export interface LabelSet {
 	order: number;
 	/** `homemedia.lan_only` — `true` for `true`/`1`/`yes` (case-insensitive). */
 	lanOnly: boolean;
+	/**
+	 * `homemedia.placement` (feature 002) — `home` only for an exact
+	 * case-insensitive `home`; every other value, blank, or absent →
+	 * {@link DEFAULT_PLACEMENT} (`manage`). Never `null`.
+	 */
+	placement: Placement;
+	/**
+	 * `homemedia.home_label` (feature 002) — trimmed, or `null` when absent/blank.
+	 * The action-phrased primary-card title; only meaningful when
+	 * `placement === 'home'`.
+	 */
+	homeLabel: string | null;
+}
+
+/** Parse `homemedia.placement`: exact (ci) `home` → `home`; anything else → `manage`. */
+export function parsePlacementLabel(value: string | undefined): Placement {
+	if (typeof value !== 'string') return DEFAULT_PLACEMENT;
+	return value.trim().toLowerCase() === 'home' ? 'home' : DEFAULT_PLACEMENT;
 }
 
 /** `true` for `true` / `1` / `yes` (case-insensitive, trimmed); everything else `false`. */
@@ -122,6 +150,7 @@ export function parseLabels(labels: Record<string, string>): LabelSet {
 	const rawCategory = get('category');
 	const category = rawCategory ? collapseWhitespace(rawCategory) : '';
 	const rawDescription = get('description')?.trim();
+	const rawHomeLabel = get('home_label')?.trim();
 
 	return {
 		name: rawName ? rawName : null,
@@ -131,6 +160,8 @@ export function parseLabels(labels: Record<string, string>): LabelSet {
 		url: parseUrlLabel(get('url')),
 		port: parsePortLabel(get('port')),
 		order: parseIntegerLabel(get('order')) ?? DEFAULT_ORDER,
-		lanOnly: parseBooleanLabel(get('lan_only'))
+		lanOnly: parseBooleanLabel(get('lan_only')),
+		placement: parsePlacementLabel(get('placement')),
+		homeLabel: rawHomeLabel ? rawHomeLabel : null
 	};
 }

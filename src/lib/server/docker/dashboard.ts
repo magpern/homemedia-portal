@@ -49,6 +49,16 @@ export interface DashboardDeps {
 
 const EMPTY_COUNTS = { services: 0, up: 0, down: 0, unknown: 0 } as const;
 
+/** An empty model in the shape callers expect (failure mode B / no data). */
+const EMPTY_MODEL = {
+	sourceOk: false as const,
+	categories: [] as Category[],
+	primary: [] as ServiceProjection[],
+	manage: [] as Category[],
+	manageCount: 0,
+	counts: { ...EMPTY_COUNTS }
+};
+
 /** Read one container's status, closing a per-inspect failure to `unknown`. */
 async function readStatus(
 	container: RawContainer,
@@ -127,7 +137,7 @@ export async function buildDashboardModel(deps: DashboardDeps = {}): Promise<Das
 
 	// Failure mode B — discovery itself failed. No list, nothing retained.
 	if (!discovery.ok) {
-		return { generatedAt, sourceOk: false, categories: [], counts: { ...EMPTY_COUNTS } };
+		return { generatedAt, ...EMPTY_MODEL };
 	}
 
 	const statuses = await Promise.all(
@@ -140,10 +150,18 @@ export async function buildDashboardModel(deps: DashboardDeps = {}): Promise<Das
 		})
 	);
 
+	// Feature 002 — partition the *same* projected list into the friendly view.
+	// `categories` still spans every service (no-home fallback + honest totals).
+	const primaryServices = services.filter((s) => s.placement === 'home').sort(sortServices);
+	const manageServices = services.filter((s) => s.placement === 'manage');
+
 	return {
 		generatedAt,
 		sourceOk: true,
 		categories: groupIntoCategories(services),
+		primary: primaryServices,
+		manage: groupIntoCategories(manageServices),
+		manageCount: manageServices.length,
 		counts: countStatuses(services)
 	};
 }

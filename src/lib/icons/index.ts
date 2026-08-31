@@ -17,6 +17,14 @@
 import genericSvg from './svg/generic.svg?raw';
 import dashboardIconsSvg from './svg/dashboard-icons.svg?raw';
 import dockerSvg from './svg/docker.svg?raw';
+// Feature 002 — neutral household-role glyphs, authored for this project (like
+// `generic.svg`); they name a *role*, not a product, so the tracked id list
+// discloses nothing about the deployment's actual service inventory.
+import watchSvg from './svg/watch.svg?raw';
+import requestSvg from './svg/request.svg?raw';
+import downloadSvg from './svg/download.svg?raw';
+import settingsSvg from './svg/settings.svg?raw';
+import activitySvg from './svg/activity.svg?raw';
 
 /** Id of the neutral fallback glyph — always present, authored for this project. */
 export const GENERIC_ICON_ID = 'generic';
@@ -29,7 +37,12 @@ export const GENERIC_ICON_ID = 'generic';
 const ICON_SVG: Readonly<Record<string, string>> = Object.freeze({
 	[GENERIC_ICON_ID]: genericSvg,
 	'dashboard-icons': dashboardIconsSvg,
-	docker: dockerSvg
+	docker: dockerSvg,
+	watch: watchSvg,
+	request: requestSvg,
+	download: downloadSvg,
+	settings: settingsSvg,
+	activity: activitySvg
 });
 
 /** Every bundled icon id, sorted, including the generic fallback. */

@@ -130,7 +130,9 @@ describe('projectService — full tile', () => {
 			lanOnly: true,
 			order: 10,
 			status: 'up',
-			statusLabel: 'Running'
+			statusLabel: 'Running',
+			placement: 'manage',
+			homeLabel: null
 		});
 	});
 
@@ -161,6 +163,32 @@ describe('projectService — full tile', () => {
 			{ serviceLinkBase: null }
 		);
 		expect(guessed.iconId).toBe('generic');
+	});
+
+	it('carries placement + home_label onto the projection (feature 002)', () => {
+		const p = projectService(
+			container({ names: ['/library'] }),
+			parseLabels({
+				'homemedia.enable': 'true',
+				'homemedia.placement': 'home',
+				'homemedia.home_label': 'Watch the library'
+			}),
+			UP,
+			{ serviceLinkBase: null }
+		);
+		expect(p.placement).toBe('home');
+		expect(p.homeLabel).toBe('Watch the library');
+		// primary-card title rule = homeLabel ?? name
+		expect(p.homeLabel ?? p.name).toBe('Watch the library');
+
+		const noLabel = projectService(
+			container({ names: ['/library'] }),
+			parseLabels({ 'homemedia.enable': 'true', 'homemedia.placement': 'home' }),
+			UP,
+			{ serviceLinkBase: null }
+		);
+		expect(noLabel.homeLabel).toBeNull();
+		expect(noLabel.homeLabel ?? noLabel.name).toBe('Library');
 	});
 
 	it('carries a per-inspect failure through as status-unavailable', () => {

@@ -1,7 +1,7 @@
 {
-	"name": "homemedia-portal",
-	"short_name": "Portal",
-	"description": "A curated, mobile-first directory of the services on one private home server.",
+	"name": "Home media",
+	"short_name": "Home media",
+	"description": "The household's media hub — watch the library, request something new, and reach the tools that keep it running.",
 	"id": "/",
 	"start_url": "/",
 	"scope": "/",

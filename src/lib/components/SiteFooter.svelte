@@ -10,7 +10,7 @@
 <footer class="site-footer">
 	<h2>About</h2>
 	<p>
-		homemedia-portal — a private, read-only directory of this server's services. It links to
+		Home media — a private, read-only directory of this household's services. It links to
 		services; it never controls them.
 	</p>
 	<AttributionNotice />

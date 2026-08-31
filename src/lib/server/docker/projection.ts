@@ -118,7 +118,9 @@ export function projectService(
 		lanOnly: labels.lanOnly,
 		order: labels.order,
 		status: status.status,
-		statusLabel: status.statusLabel
+		statusLabel: status.statusLabel,
+		placement: labels.placement,
+		homeLabel: labels.homeLabel
 	};
 }
 

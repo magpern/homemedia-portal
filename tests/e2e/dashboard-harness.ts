@@ -56,9 +56,10 @@ export interface MockContainer {
  */
 export async function setCurationFixture(
 	request: APIRequestContext,
-	containers: MockContainer[] | null
+	containers: MockContainer[] | null,
+	inspect?: Record<string, unknown>
 ): Promise<void> {
-	const data = containers ? { mode: 'normal', containers } : { mode: 'normal' };
+	const data = containers ? { mode: 'normal', containers, inspect } : { mode: 'normal' };
 	const res = await request.post(new URL('/__control', mockBase()).href, { data });
 	if (!res.ok()) throw new Error(`docker mock refused curation fixture (${res.status()})`);
 }

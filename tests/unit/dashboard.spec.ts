@@ -33,6 +33,8 @@ const svc = (partial: Partial<ServiceProjection>): ServiceProjection => ({
 	order: 100,
 	status: 'up',
 	statusLabel: 'Running',
+	placement: 'manage',
+	homeLabel: null,
 	...partial
 });
 
@@ -155,5 +157,85 @@ describe('buildDashboardModel — happy path', () => {
 		expect(model.sourceOk).toBe(true);
 		expect(model.categories).toEqual([]);
 		expect(model.counts.services).toBe(0);
+		expect(model.primary).toEqual([]);
+		expect(model.manage).toEqual([]);
+		expect(model.manageCount).toBe(0);
+	});
+});
+
+describe('buildDashboardModel — friendly-home-view partition (feature 002)', () => {
+	const discoverMixed = async () => ({
+		ok: true as const,
+		containers: [
+			raw('watch', {
+				'homemedia.name': 'Library',
+				'homemedia.placement': 'home',
+				'homemedia.home_label': 'Watch the library',
+				'homemedia.order': '20'
+			}),
+			raw('request', {
+				'homemedia.name': 'Requests',
+				'homemedia.placement': 'home',
+				'homemedia.order': '10'
+			}),
+			raw('sonarr', { 'homemedia.name': 'Auto A', 'homemedia.category': 'Automation' }),
+			raw('portainer', { 'homemedia.name': 'Ops A', 'homemedia.category': 'Ops' })
+		]
+	});
+
+	it('splits home vs manage; categories still spans all; counts are over all', async () => {
+		const model = await buildDashboardModel({
+			discover: discoverMixed,
+			inspect: inspectRunning,
+			serviceLinkBase: LINK_BASE
+		});
+
+		// primary: only home services, sorted by order then name
+		expect(model.primary.map((s) => s.name)).toEqual(['Requests', 'Library']);
+		expect(model.primary.every((s) => s.placement === 'home')).toBe(true);
+
+		// manage: only manage services, grouped as Portal v1
+		const manageNames = model.manage.flatMap((c) => c.services.map((s) => s.name));
+		expect(manageNames.sort()).toEqual(['Auto A', 'Ops A']);
+		expect(model.manageCount).toBe(2);
+
+		// disjoint partition covering every discovered service
+		const primaryNames = new Set(model.primary.map((s) => s.name));
+		expect(manageNames.some((n) => primaryNames.has(n))).toBe(false);
+
+		// categories still lists all four (fallback + honest totals)
+		expect(model.categories.flatMap((c) => c.services).length).toBe(4);
+		expect(model.counts.services).toBe(4);
+	});
+
+	it('no home service → primary empty (page falls back to categories)', async () => {
+		const model = await buildDashboardModel({
+			discover: async () => ({
+				ok: true,
+				containers: [raw('a', { 'homemedia.name': 'A', 'homemedia.category': 'Ops' })]
+			}),
+			inspect: inspectRunning,
+			serviceLinkBase: LINK_BASE
+		});
+		expect(model.primary).toEqual([]);
+		expect(model.manageCount).toBe(1);
+		expect(model.categories.flatMap((c) => c.services).map((s) => s.name)).toEqual(['A']);
+	});
+
+	it('all home services → manage empty', async () => {
+		const model = await buildDashboardModel({
+			discover: async () => ({
+				ok: true,
+				containers: [
+					raw('a', { 'homemedia.name': 'A', 'homemedia.placement': 'home' }),
+					raw('b', { 'homemedia.name': 'B', 'homemedia.placement': 'home' })
+				]
+			}),
+			inspect: inspectRunning,
+			serviceLinkBase: LINK_BASE
+		});
+		expect(model.primary.map((s) => s.name)).toEqual(['A', 'B']);
+		expect(model.manage).toEqual([]);
+		expect(model.manageCount).toBe(0);
 	});
 });

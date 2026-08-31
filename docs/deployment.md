@@ -83,6 +83,25 @@ env file are private operator configuration:
 - The container is always **stopped and re-applied**, never destroyed, and
   **never** with volume removal. There is **no** auto-updater.
 
+## Label rollout for Friendly Home View (feature 002)
+
+Friendly Home View is driven entirely by `homemedia.*` labels — no portal rebuild or
+restart. Before it is accepted in practice, curate the label set on **every** service
+that is already opted in (`homemedia.enable=true`):
+
+- pick the two household-facing actions (watch the library; find/request something) and
+  add `homemedia.placement: "home"` plus a friendly `homemedia.home_label` and a
+  meaningful `homemedia.description`;
+- add `homemedia.placement: "manage"` (or leave it off — `manage` is the default) plus a
+  meaningful `homemedia.description` to every other service;
+- apply one service at a time with the normal "re-apply this one service" step so only
+  that container is recreated — do not restart the portal or the stack;
+- record the change in the private migration log.
+
+The concrete service names and label values are private operator configuration and never
+go in this repository. A service with no `homemedia.description` still renders — it shows
+a fixed generic sentence — but that is a safety net, not the intended experience.
+
 ## External access
 
 Reaching the portal from outside the home network is handled by a separately

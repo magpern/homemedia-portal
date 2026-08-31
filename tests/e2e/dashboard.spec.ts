@@ -37,7 +37,7 @@ test.beforeEach(async ({ context, request }, testInfo) => {
 test.describe('dashboard rendering + search (WP6)', () => {
 	test('renders labelled services grouped by category', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.locator('h1')).toHaveText('homemedia-portal');
+		await expect(page.locator('h1')).toHaveText('Home media');
 
 		const sections = page.locator('section.category');
 		await expect(sections).toHaveCount(2);

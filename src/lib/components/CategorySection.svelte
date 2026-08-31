@@ -3,7 +3,11 @@
 	import type { Category } from '$lib/types';
 	import ServiceCard from './ServiceCard.svelte';
 
-	let { category }: { category: Category } = $props();
+	/** `descriptionFallback` (feature 002) is forwarded to every tile — see ServiceCard. */
+	let {
+		category,
+		descriptionFallback = null
+	}: { category: Category; descriptionFallback?: string | null } = $props();
 </script>
 
 <section class="category" aria-labelledby="category-{category.key}">
@@ -13,7 +17,7 @@
 	</h2>
 	<ul class="cards">
 		{#each category.services as service (service.slug)}
-			<li><ServiceCard {service} /></li>
+			<li><ServiceCard {service} {descriptionFallback} /></li>
 		{/each}
 	</ul>
 </section>

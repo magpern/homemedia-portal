@@ -35,7 +35,9 @@ describe('parseLabels — defaults when keys are absent', () => {
 			url: null,
 			port: null,
 			order: DEFAULT_ORDER,
-			lanOnly: false
+			lanOnly: false,
+			placement: 'manage',
+			homeLabel: null
 		});
 	});
 
@@ -143,6 +145,31 @@ describe('parseLabels — lan_only', () => {
 	});
 });
 
+describe('parseLabels — placement + home_label (feature 002)', () => {
+	it.each(['home', 'HOME', ' Home '])('placement %j → home', (v) => {
+		expect(parseLabels({ ...enabled, 'homemedia.placement': v }).placement).toBe('home');
+	});
+
+	it.each(['manage', 'tools', 'admin', '1', 'true', '', '  ', 'homey'])(
+		'placement %j → manage (default)',
+		(v) => {
+			expect(parseLabels({ ...enabled, 'homemedia.placement': v }).placement).toBe('manage');
+		}
+	);
+
+	it('placement defaults to manage when the label is absent', () => {
+		expect(parseLabels({ ...enabled }).placement).toBe('manage');
+	});
+
+	it('trims home_label and drops a blank one', () => {
+		expect(
+			parseLabels({ ...enabled, 'homemedia.home_label': '  Watch the library  ' }).homeLabel
+		).toBe('Watch the library');
+		expect(parseLabels({ ...enabled, 'homemedia.home_label': '   ' }).homeLabel).toBeNull();
+		expect(parseLabels({ ...enabled }).homeLabel).toBeNull();
+	});
+});
+
 describe('parseLabels — forward compatibility / isolation', () => {
 	it('ignores unknown homemedia.* keys', () => {
 		const set = parseLabels({ ...enabled, 'homemedia.future': 'x', 'homemedia.badge': 'new' });
@@ -172,10 +199,12 @@ describe('parseLabels — forward compatibility / isolation', () => {
 				[
 					'category',
 					'description',
+					'homeLabel',
 					'icon',
 					'lanOnly',
 					'name',
 					'order',
+					'placement',
 					'port',
 					'url'
 				].sort()
