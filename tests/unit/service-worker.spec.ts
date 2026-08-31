@@ -2,13 +2,12 @@
  * Static-only guarantee for `src/service-worker.ts` (Constitution X, FR-024,
  * research R8).
  *
- * A source-structure check that runs in `npm test` on every platform — it does
- * not need a browser. The live cache-enumeration + offline checks are in
- * `tests/e2e/pwa.spec.ts` (they need a Service-Worker-capable Chromium; the
- * `chromium-headless-shell` that Playwright downloads by default — in this
- * sandbox and in CI — never resolves `navigator.serviceWorker.ready`, so those
- * two `test`s skip there and are exercised when the suite is run against a full
- * Chromium). This spec is what keeps the invariant enforced in the meantime.
+ * A source-structure check that runs in `npm test` on every platform — no
+ * browser needed. The live cache-enumeration + offline checks and Chrome's
+ * installability check are in `tests/e2e/pwa.spec.ts`, in the `pwa` Playwright
+ * project on the full `channel: 'chromium'` build (CI runs it; a library-starved
+ * sandbox omits that project with a printed message). This spec keeps the
+ * invariant enforced regardless.
  */
 
 import { readFileSync } from 'node:fs';
