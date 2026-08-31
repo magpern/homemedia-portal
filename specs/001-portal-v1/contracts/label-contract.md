@@ -79,6 +79,28 @@ Examples below use placeholder names only — no real service inventory.
   portal still renders the link but performs no proxying/tunnelling; opening it
   from outside the home network may simply not connect, which is expected.
 
+### `homemedia.placement` *(added by feature 002 — Friendly Home View)*
+
+- Type: enum. Accepted values (case-insensitive, trimmed): `home`, `manage`.
+- Default: `manage`. Any other value, blank, or absent → `manage` (not an error).
+- `home` → shown as a large primary-action card on the default landing view and **not**
+  listed in the collapsed "Manage media" section (still searchable).
+- `manage` → shown inside "Manage media", grouped by `homemedia.category` as before.
+- If no service is `placement=home`, the landing view falls back to the Portal v1 grouped
+  dashboard unchanged. Full detail:
+  [`specs/002-friendly-home-view/contracts/label-contract-delta.md`](../../002-friendly-home-view/contracts/label-contract-delta.md).
+
+### `homemedia.home_label` *(added by feature 002 — Friendly Home View)*
+
+- Type: string. Optional; no default. Used only when `homemedia.placement=home`.
+- The action-phrased title of the primary card. Title resolution:
+  `homemedia.home_label` → `homemedia.name` → de-slugified container name.
+- Long values truncate in the UI; the full value is kept for search and `aria-label`.
+
+> Feature 002 also makes `homemedia.description` effectively expected on every enabled
+> service: it is shown on every card, and when absent/blank a fixed deterministic sentence
+> keyed on `placement` is shown instead (never blank, never a raw value).
+
 ---
 
 ## Unknown keys
